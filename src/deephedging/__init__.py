@@ -14,8 +14,8 @@ from deephedging.evaluation import (
     pnl_summary,
 )
 from deephedging.frictions import CostModel, NoCost, ProportionalCost
-from deephedging.instruments import EuropeanCall, EuropeanPut, Payoff
-from deephedging.market import GBMSimulator, PathSimulator
+from deephedging.instruments import EuropeanCall, EuropeanPut, Payoff, UpAndOutCall
+from deephedging.market import GBMSimulator, HestonSimulator, PathSimulator
 from deephedging.policies import FeedForwardPolicy, HedgePolicy, RecurrentPolicy
 from deephedging.risk import CVaR, Entropic, RiskMeasure
 from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, train
@@ -31,6 +31,7 @@ __all__ = [
     "FeedForwardPolicy",
     "GBMSimulator",
     "HedgePolicy",
+    "HestonSimulator",
     "NoCost",
     "Payoff",
     "PathSimulator",
@@ -38,6 +39,7 @@ __all__ = [
     "RecurrentPolicy",
     "RiskMeasure",
     "TrainConfig",
+    "UpAndOutCall",
     "bs_call_delta",
     "bs_call_price",
     "bs_call_vega",
