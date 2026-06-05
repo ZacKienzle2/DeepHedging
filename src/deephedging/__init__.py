@@ -4,6 +4,15 @@ Neural hedging policies trained against convex risk measures over simulated
 market paths under realistic frictions.
 """
 
+from deephedging.bsde import (
+    BSDEConfig,
+    BSDEProblem,
+    BSDEResult,
+    DeepBSDESolver,
+    DiscountGenerator,
+    ZeroGenerator,
+    train_bsde,
+)
 from deephedging.evaluation import (
     bs_call_delta,
     bs_call_price,
@@ -23,8 +32,13 @@ from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, tra
 __version__ = "0.1.0"
 
 __all__ = [
+    "BSDEConfig",
+    "BSDEProblem",
+    "BSDEResult",
     "CVaR",
     "CostModel",
+    "DeepBSDESolver",
+    "DiscountGenerator",
     "Entropic",
     "EuropeanCall",
     "EuropeanPut",
@@ -40,6 +54,7 @@ __all__ = [
     "RiskMeasure",
     "TrainConfig",
     "UpAndOutCall",
+    "ZeroGenerator",
     "bs_call_delta",
     "bs_call_price",
     "bs_call_vega",
@@ -50,4 +65,5 @@ __all__ = [
     "pnl_from_positions",
     "pnl_summary",
     "train",
+    "train_bsde",
 ]
