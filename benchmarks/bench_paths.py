@@ -1,14 +1,20 @@
-"""Throughput baseline for simulators and the episode engine.
+"""Throughput baselines for simulators, pricing, and the episode engine.
 
-Run from the repository root. Prints paths per second for generation
-alone and for a full training step, the numbers any future fused
-generator must beat.
+Run from the repository root. Generation, pricing, and training rates
+share the paths-per-second unit but measure different work per path, so
+they are comparable only within a row across devices or backends, never
+across rows: a faster generator cannot lift the training rate beyond
+generation's small share of the step. The pricing rows time the full
+estimate including payoff and reduction on both the fold and the grid
+route, so their ratio reflects the pricer a user calls rather than
+generation in isolation.
 
     uv run python benchmarks/bench_paths.py [--device cuda] [--json out.json]
 """
 
 import argparse
 import json
+import os
 import time
 from collections.abc import Callable
 
@@ -27,7 +33,8 @@ from deephedging import (
 
 
 def _timed(fn: Callable[[], None], repeats: int, device: str) -> float:
-    fn()
+    for _ in range(3):
+        fn()
     if device == "cuda":
         torch.cuda.synchronize()
     start = time.perf_counter()
@@ -48,6 +55,8 @@ def main() -> None:
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--json", default=None)
     args = parser.parse_args()
+    if args.device == "cpu":
+        torch.set_num_threads(os.cpu_count() or 1)
 
     gbm = GBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=args.steps, device=args.device)
     heston = HestonSimulator(
