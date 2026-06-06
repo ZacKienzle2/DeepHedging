@@ -139,7 +139,7 @@ def main() -> None:
     batch_paths = 1024 if arguments.smoke else 65_536
     eval_paths = 4096 if arguments.smoke else 200_000
     seeds = (1,) if arguments.smoke else (1, 2, 3, 4, 5)
-    cost_rates = (0.0, 1e-3) if arguments.smoke else (0.0, 5e-4, 1e-3, 2e-3)
+    cost_rates = (0.0, 1e-3) if arguments.smoke else (0.0, 2e-4, 5e-4, 1e-3, 2e-3, 4e-3)
     alphas = (0.95,) if arguments.smoke else (0.5, 0.9, 0.99)
 
     results_path = RESULTS.replace(".jsonl", "_smoke.jsonl") if arguments.smoke else RESULTS
