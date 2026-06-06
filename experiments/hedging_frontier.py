@@ -40,7 +40,7 @@ from deephedging.frictions.base import CostModel
 from deephedging.training.trainer import TrainResult
 
 SIGMA = 0.2
-MATURITY = 0.25
+MATURITY = 30 / 365
 N_STEPS = 30
 STRIKE = 100.0
 RESULTS = "experiments/hedging_frontier.jsonl"
