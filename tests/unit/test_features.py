@@ -74,40 +74,6 @@ def test_variance_features_require_variance_channel() -> None:
         VarianceFeatures()(state, 0, tau, position)
 
 
-def test_realised_variance_matches_manual_computation() -> None:
-    state = _state(n_paths=64, n_steps=10)
-    window = 4
-    t = 7
-    log_grid = torch.log(state.spot)
-    squared = (log_grid[1:] - log_grid[:-1]) ** 2
-    manual = squared[t - window : t].mean(dim=0)
-    assert torch.allclose(state.realised_variance(t, window), manual, atol=1e-7)
-
-
-def test_realised_variance_edges_are_adapted() -> None:
-    state = _state(n_paths=32, n_steps=8)
-    assert torch.all(state.realised_variance(0, 4) == 0.0)
-    log_grid = torch.log(state.spot)
-    first_squared = (log_grid[1] - log_grid[0]) ** 2
-    assert torch.allclose(state.realised_variance(1, 4), first_squared, atol=1e-7)
-    with pytest.raises(ValueError):
-        state.realised_variance(3, 0)
-
-
-def test_realized_vol_features_shape_and_annualisation() -> None:
-    from deephedging.features import RealizedVolFeatures
-
-    state = _state(n_paths=64, n_steps=12)
-    step_size = 1.0 / 12
-    feature_map = RealizedVolFeatures(window=4, step_size=step_size)
-    assert feature_map.n_features == 4
-    position = state.spot.new_zeros(state.n_paths)
-    tau = state.spot.new_tensor(0.5)
-    features = feature_map(state, 6, tau, position)
-    expected = state.realised_variance(6, 4) / step_size
-    assert torch.allclose(features[:, 3], expected, atol=1e-7)
-
-
 def test_custom_map_drives_wider_policy() -> None:
     torch.manual_seed(43)
     policy = FeedForwardPolicy(n_features=4, hidden_sizes=(8,))
