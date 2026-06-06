@@ -250,11 +250,13 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "ipykernel" },
-    { name = "matplotlib" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "ruff" },
+]
+notebook = [
+    { name = "ipykernel" },
+    { name = "matplotlib" },
 ]
 
 [package.dev-dependencies]
@@ -264,16 +266,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29" },
-    { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.8" },
+    { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=6.29,<10" },
+    { name = "matplotlib", marker = "extra == 'notebook'", specifier = ">=3.8" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.350" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
-    { name = "torch", marker = "sys_platform != 'linux' and sys_platform != 'win32'", specifier = ">=2.2" },
-    { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.2", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "torch", marker = "sys_platform == 'win32'", specifier = ">=2.2", index = "https://download.pytorch.org/whl/cu130" },
+    { name = "torch", marker = "sys_platform != 'linux' and sys_platform != 'win32'", specifier = ">=2.2,<3" },
+    { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.2,<3", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torch", marker = "sys_platform == 'win32'", specifier = ">=2.2,<3", index = "https://download.pytorch.org/whl/cu130" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "notebook"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ninja", specifier = ">=1.13.0" }]

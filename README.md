@@ -47,6 +47,7 @@ is used automatically when available; everything also runs on CPU.
 git clone https://github.com/ZacKienzle2/DeepHedging.git
 cd DeepHedging
 uv sync --extra dev
+uv sync --extra notebook   # additionally, for Main.ipynb
 ```
 
 ## Quality gates

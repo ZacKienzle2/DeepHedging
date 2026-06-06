@@ -9,7 +9,7 @@ description = "Deep hedging research framework: neural hedging policies under ma
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "torch>=2.2",
+    "torch>=2.2,<3",
 ]
 
 [project.optional-dependencies]
@@ -17,8 +17,10 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "pyright>=1.1.350",
+]
+notebook = [
     "matplotlib>=3.8",
-    "ipykernel>=6.29",
+    "ipykernel>=6.29,<10",
 ]
 
 [[tool.uv.index]]
