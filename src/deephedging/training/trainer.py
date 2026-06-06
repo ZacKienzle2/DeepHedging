@@ -1,5 +1,6 @@
 """Training loop for hedging policies."""
 
+import warnings
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -51,9 +52,15 @@ class TrainConfig:
             activations, so capturing the per-step policy and replaying
             it many times before a single backward corrupts gradients.
             Auxiliary channels such as the Heston variance are passed
-            alongside the spot grid in sorted key order. Requires CUDA
-            and a fixed batch size; mutually exclusive with
-            checkpointing, compilation, and autocast.
+            alongside the spot grid in sorted key order. Capture keeps
+            a private memory pool that roughly doubles the resident
+            activation footprint, and a batch that overflows physical
+            device memory degrades silently into host paging at a
+            throughput collapse of more than an order of magnitude, so
+            the trainer warns when the post-capture reservation
+            approaches the device capacity. Requires CUDA and a fixed
+            batch size; mutually exclusive with checkpointing,
+            compilation, and autocast.
     """
 
     n_iterations: int = 2000
@@ -224,6 +231,15 @@ def train(
             *(warmup_state.aux[key].clone() for key in aux_keys),
         )
         graphed_loss = torch.cuda.make_graphed_callables(episode, sample_args)
+        reserved = torch.cuda.memory_reserved(device)
+        capacity = torch.cuda.get_device_properties(device).total_memory
+        if reserved > 0.8 * capacity:
+            warnings.warn(
+                f"graph capture reserves {reserved / 2**30:.1f}GiB of "
+                f"{capacity / 2**30:.1f}GiB; batches beyond physical memory "
+                "page through the host and collapse throughput",
+                stacklevel=2,
+            )
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
         state = batch_state(iteration + 1)
