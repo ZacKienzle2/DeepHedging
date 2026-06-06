@@ -121,7 +121,7 @@ def main() -> None:
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     arguments = parser.parse_args()
 
-    iterations = 30 if arguments.smoke else 2000
+    iterations = 30 if arguments.smoke else 4000
     batch_paths = 1024 if arguments.smoke else 65_536
     eval_paths = 4096 if arguments.smoke else 200_000
     premium_paths = 65_536 if arguments.smoke else 1_000_000
@@ -182,6 +182,7 @@ def main() -> None:
                     batch_paths=batch_paths,
                     lr=1e-3,
                     seed=seed,
+                    checkpoint_steps=(arguments.device == "cuda"),
                     graph_episode=(arguments.device == "cuda"),
                 )
                 started = time.perf_counter()
@@ -230,6 +231,9 @@ def main() -> None:
                     f"es95 {summary['es_95']:7.4f}  es99 {summary['es_99']:7.4f}  "
                     f"mean {summary['mean']:7.4f}  {duration:6.1f}s"
                 )
+                del policy
+                if arguments.device == "cuda":
+                    torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
