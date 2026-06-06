@@ -100,8 +100,10 @@ def pnl_from_positions(
 
     Args:
         state: Simulated market state.
-        positions: Hedge positions of shape ``(n_steps, n_paths)``; row ``t``
-            is held over the interval ``[t, t + 1)``.
+        positions: Hedge positions of shape ``(n_steps, n_paths)`` for a
+            single asset or ``(n_steps, n_paths, n_assets)`` with the
+            trailing asset axis contracted in the gains and cost
+            reductions; row ``t`` is held over the interval ``[t, t + 1)``.
         payoff: Liability payoff, charged at maturity.
         cost_model: Transaction cost model.
         premium: Premium received for the liability at inception.
@@ -112,10 +114,14 @@ def pnl_from_positions(
         PnL per path of shape ``(n_paths,)``; positive is profit.
     """
     paths = state.spot
-    gains = (positions * (paths[1:] - paths[:-1])).sum(dim=0)
-    initial = positions.new_zeros((1, positions.shape[1]))
+
+    def per_path(values: torch.Tensor) -> torch.Tensor:
+        return values.sum(dim=-1) if values.dim() == 2 else values
+
+    gains = per_path((positions * (paths[1:] - paths[:-1])).sum(dim=0))
+    initial = positions.new_zeros((1, *positions.shape[1:]))
     trades = torch.diff(positions, dim=0, prepend=initial)
-    costs = cost_model(trades, paths[:-1]).sum(dim=0)
+    costs = per_path(cost_model(trades, paths[:-1]).sum(dim=0))
     if liquidate_terminal:
-        costs = costs + cost_model(positions[-1], paths[-1])
+        costs = costs + per_path(cost_model(positions[-1], paths[-1]))
     return premium + gains - costs - payoff(paths)

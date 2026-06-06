@@ -1,6 +1,7 @@
 """Market path simulators."""
 
 from deephedging.market.base import PathSimulator
+from deephedging.market.correlated import CorrelatedGBMSimulator
 from deephedging.market.cuda import (
     CudaGBMSimulator,
     CudaHestonSimulator,
@@ -12,6 +13,7 @@ from deephedging.market.noise import NoiseSpec
 from deephedging.market.state import MarketState
 
 __all__ = [
+    "CorrelatedGBMSimulator",
     "CudaGBMSimulator",
     "CudaHestonSimulator",
     "GBMSimulator",

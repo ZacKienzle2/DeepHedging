@@ -35,8 +35,16 @@ from deephedging.features import (
     VarianceFeatures,
 )
 from deephedging.frictions import CostModel, NoCost, ProportionalCost
-from deephedging.instruments import EuropeanCall, EuropeanPut, Payoff, UpAndOutCall
+from deephedging.instruments import (
+    BasketCall,
+    EuropeanCall,
+    EuropeanPut,
+    GeometricBasketCall,
+    Payoff,
+    UpAndOutCall,
+)
 from deephedging.market import (
+    CorrelatedGBMSimulator,
     GBMSimulator,
     HestonSimulator,
     MarketState,
@@ -60,8 +68,10 @@ __all__ = [
     "BSDEProblem",
     "BSDEResult",
     "BarrierAliveAccumulator",
+    "BasketCall",
     "BlackScholesPricer",
     "CVaR",
+    "CorrelatedGBMSimulator",
     "CostModel",
     "DeepBSDESolver",
     "DefaultFeatures",
@@ -72,6 +82,7 @@ __all__ = [
     "EuropeanPut",
     "FeedForwardPolicy",
     "GBMSimulator",
+    "GeometricBasketCall",
     "HedgePolicy",
     "HestonSimulator",
     "MarketState",
