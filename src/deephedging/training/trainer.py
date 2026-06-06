@@ -40,6 +40,18 @@ class TrainConfig:
             toolchain; incompatible with ``checkpoint_steps``.
         amp: Whether to run the policy network under bfloat16 autocast;
             see :func:`~deephedging.training.engine.hedge_pnl`.
+        graph_episode: Whether to capture the whole episode, forward and
+            backward through loss, in one CUDA graph and replay it per
+            iteration. The training loop is dispatch-bound at small
+            network widths, with the host issuing tens of microsecond
+            kernels while the device idles; replay collapses the entire
+            iteration into one launch. The episode is the correct
+            capture unit because a graphed callable keeps static saved
+            activations, so capturing the per-step policy and replaying
+            it many times before a single backward corrupts gradients.
+            Requires CUDA, a fixed batch size, and a simulator whose
+            state the feature map reads through ``spot`` alone; mutually
+            exclusive with checkpointing, compilation, and autocast.
     """
 
     n_iterations: int = 2000
@@ -51,6 +63,55 @@ class TrainConfig:
     liquidate_terminal: bool = False
     compile_policy: bool = False
     amp: bool = False
+    graph_episode: bool = False
+
+
+class _EpisodeLoss(torch.nn.Module):
+    """Whole-iteration module mapping a spot grid to the risk objective.
+
+    Registers the policy and the risk measure as submodules so a CUDA
+    graph capture of this module records their forward and backward
+    passes and accumulates gradients into their parameters.
+    """
+
+    def __init__(
+        self,
+        policy: HedgePolicy,
+        payoff: Payoff,
+        cost_model: CostModel,
+        risk_measure: RiskMeasure,
+        feature_map: FeatureMap | None,
+        premium: float | torch.Tensor,
+        liquidate_terminal: bool,
+    ) -> None:
+        super().__init__()
+        self.policy = policy
+        self.risk_measure = risk_measure
+        self.payoff = payoff
+        self.cost_model = cost_model
+        self.feature_map = feature_map
+        self.premium = premium
+        self.liquidate_terminal = liquidate_terminal
+
+    def forward(self, spot: torch.Tensor) -> torch.Tensor:
+        """Runs one full episode and reduces to the scalar objective.
+
+        Args:
+            spot: Price grid of shape ``(n_steps + 1, n_paths)``.
+
+        Returns:
+            Scalar risk objective.
+        """
+        pnl = hedge_pnl(
+            MarketState(spot=spot),
+            self.policy,
+            self.payoff,
+            self.cost_model,
+            premium=self.premium,
+            liquidate_terminal=self.liquidate_terminal,
+            feature_map=self.feature_map,
+        )
+        return self.risk_measure(-pnl)
 
 
 @dataclass
@@ -97,12 +158,16 @@ def train(
         The recorded training losses.
 
     Raises:
-        ValueError: If the config enables both policy compilation and
-            gradient checkpointing.
+        ValueError: If the config combines mutually exclusive options or
+            requests episode capture off the CUDA device.
     """
     if config.compile_policy and config.checkpoint_steps:
         raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
+    if config.graph_episode and (config.compile_policy or config.checkpoint_steps or config.amp):
+        raise ValueError("graph_episode excludes compilation, checkpointing, and autocast")
     device = next(policy.parameters()).device
+    if config.graph_episode and device.type != "cuda":
+        raise ValueError("graph_episode requires the policy on a CUDA device")
     risk_measure.to(device)
     base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
     stepper: HedgePolicy = policy
@@ -119,9 +184,10 @@ def train(
         risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
         param_groups.append({"params": risk_params, "lr": risk_lr})
     optimizer = torch.optim.Adam(param_groups)
+    warmup_state = batch_state(0)
     with torch.no_grad():
         warmup_pnl = hedge_pnl(
-            batch_state(0),
+            warmup_state,
             stepper,
             payoff,
             cost_model,
@@ -131,23 +197,40 @@ def train(
             amp=config.amp,
         )
         risk_measure.warm_start(-warmup_pnl)
-    loss_history: list[torch.Tensor] = []
-    for iteration in range(config.n_iterations):
-        pnl = hedge_pnl(
-            batch_state(iteration + 1),
-            stepper,
+    graphed_loss = None
+    if config.graph_episode:
+        episode = _EpisodeLoss(
+            policy,
             payoff,
             cost_model,
-            premium=premium,
-            liquidate_terminal=config.liquidate_terminal,
-            checkpoint_steps=config.checkpoint_steps,
-            feature_map=feature_map,
-            amp=config.amp,
+            risk_measure,
+            feature_map,
+            premium,
+            config.liquidate_terminal,
         )
-        loss = risk_measure(-pnl)
-        optimizer.zero_grad(set_to_none=True)
+        graphed_loss = torch.cuda.make_graphed_callables(episode, (warmup_state.spot.clone(),))
+    loss_history: list[torch.Tensor] = []
+    for iteration in range(config.n_iterations):
+        state = batch_state(iteration + 1)
+        if graphed_loss is not None:
+            loss = graphed_loss(state.spot)
+            optimizer.zero_grad(set_to_none=False)
+        else:
+            pnl = hedge_pnl(
+                state,
+                stepper,
+                payoff,
+                cost_model,
+                premium=premium,
+                liquidate_terminal=config.liquidate_terminal,
+                checkpoint_steps=config.checkpoint_steps,
+                feature_map=feature_map,
+                amp=config.amp,
+            )
+            loss = risk_measure(-pnl)
+            optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        loss_history.append(loss.detach())
+        loss_history.append(loss.detach().clone())
     recorded = torch.stack(loss_history).cpu() if loss_history else torch.empty(0)
     return TrainResult(losses=recorded.tolist())
