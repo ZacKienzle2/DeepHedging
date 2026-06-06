@@ -14,6 +14,21 @@ import torch
 
 
 @dataclass(frozen=True)
+class PathFolds:
+    """Per-path statistics produced without materialising the grid.
+
+    Attributes:
+        terminal: Terminal spot per path, shape ``(n_paths,)``.
+        running_max: Path maximum including inception, same shape.
+        running_min: Path minimum including inception, same shape.
+    """
+
+    terminal: torch.Tensor
+    running_max: torch.Tensor
+    running_min: torch.Tensor
+
+
+@dataclass(frozen=True)
 class MarketState:
     """Simulated market paths with named auxiliary channels.
 

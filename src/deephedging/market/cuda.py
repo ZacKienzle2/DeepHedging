@@ -21,7 +21,7 @@ from typing import Any
 import torch
 
 from deephedging.market.noise import NoiseSpec
-from deephedging.market.state import MarketState
+from deephedging.market.state import MarketState, PathFolds
 
 _MAX_STREAM = 1 << 32
 
@@ -144,6 +144,33 @@ class CudaGBMSimulator:
         )
         return MarketState(spot=spot)
 
+    def simulate_folds(self, n_paths: int, noise: NoiseSpec | None = None) -> PathFolds:
+        """Computes per-path statistics in registers, never the grid.
+
+        Consumes exactly the same Philox stream as :meth:`simulate`, so
+        the folds match the grid-derived statistics bitwise, which the
+        parity tests pin.
+
+        Args:
+            n_paths: Number of independent paths.
+            noise: Optional addressable noise stream for exact replay.
+
+        Returns:
+            Terminal, running maximum, and running minimum per path.
+        """
+        spec = _resolve_noise(noise)
+        terminal, running_max, running_min = _kernels().gbm_folds(
+            n_paths,
+            self.n_steps,
+            self.s0,
+            self.mu,
+            self.sigma,
+            self.maturity,
+            spec.seed,
+            spec.stream,
+        )
+        return PathFolds(terminal=terminal, running_max=running_max, running_min=running_min)
+
 
 @dataclass(frozen=True)
 class CudaHestonSimulator:
@@ -219,3 +246,34 @@ class CudaHestonSimulator:
             spec.stream,
         )
         return MarketState(spot=spot, aux={"variance": variance})
+
+    def simulate_folds(self, n_paths: int, noise: NoiseSpec | None = None) -> PathFolds:
+        """Computes per-path statistics in registers, never the grid.
+
+        Consumes exactly the same Philox stream as :meth:`simulate`, so
+        the folds match the grid-derived statistics bitwise, which the
+        parity tests pin.
+
+        Args:
+            n_paths: Number of independent paths.
+            noise: Optional addressable noise stream for exact replay.
+
+        Returns:
+            Terminal, running maximum, and running minimum per path.
+        """
+        spec = _resolve_noise(noise)
+        terminal, running_max, running_min = _kernels().heston_folds(
+            n_paths,
+            self.n_steps,
+            self.s0,
+            self.v0,
+            self.kappa,
+            self.theta,
+            self.xi,
+            self.rho,
+            self.mu,
+            self.maturity,
+            spec.seed,
+            spec.stream,
+        )
+        return PathFolds(terminal=terminal, running_max=running_max, running_min=running_min)

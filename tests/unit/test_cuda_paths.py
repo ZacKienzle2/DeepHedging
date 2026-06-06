@@ -98,6 +98,40 @@ def test_heston_terminal_mean_and_skew_sign() -> None:
     assert float((centred**3).mean()) < 0.0
 
 
+def test_gbm_folds_match_grid_bitwise() -> None:
+    sim = _cuda_gbm()
+    noise = NoiseSpec(seed=163)
+    state = sim.simulate(8192, noise=noise)
+    folds = sim.simulate_folds(8192, noise=noise)
+    assert torch.equal(folds.terminal, state.terminal)
+    assert torch.equal(folds.running_max, state.spot.max(dim=0).values)
+    assert torch.equal(folds.running_min, state.spot.min(dim=0).values)
+
+
+def test_heston_folds_match_grid_bitwise() -> None:
+    sim = _cuda_heston()
+    noise = NoiseSpec(seed=167)
+    state = sim.simulate(8192, noise=noise)
+    folds = sim.simulate_folds(8192, noise=noise)
+    assert torch.equal(folds.terminal, state.terminal)
+    assert torch.equal(folds.running_max, state.spot.max(dim=0).values)
+    assert torch.equal(folds.running_min, state.spot.min(dim=0).values)
+
+
+def test_pricer_fold_route_matches_grid_route() -> None:
+    from deephedging.instruments import EuropeanCall, UpAndOutCall
+    from deephedging.pricing import MonteCarloPricer
+
+    sim = _cuda_gbm()
+    pricer = MonteCarloPricer(n_paths=100_000, seed=173)
+    for payoff in (EuropeanCall(strike=100.0), UpAndOutCall(strike=100.0, barrier=125.0)):
+        fast = pricer.price(payoff, sim)
+        grid_state = sim.simulate(100_000, noise=NoiseSpec(seed=173))
+        grid_values = payoff(grid_state.spot)
+        assert abs(fast.value - float(grid_values.mean())) < 1e-6
+        assert fast.provenance == "monte-carlo"
+
+
 def test_stream_bounds_enforced() -> None:
     sim = _cuda_gbm()
     with pytest.raises(ValueError):

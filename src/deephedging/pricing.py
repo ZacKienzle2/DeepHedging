@@ -10,12 +10,16 @@ import math
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+import torch
+
 from deephedging.evaluation.black_scholes import bs_call_price, bs_put_price
+from deephedging.instruments.barrier import UpAndOutCall
 from deephedging.instruments.base import Payoff
 from deephedging.instruments.vanilla import EuropeanCall, EuropeanPut
 from deephedging.market.base import PathSimulator
 from deephedging.market.gbm import GBMSimulator
 from deephedging.market.noise import NoiseSpec
+from deephedging.market.state import PathFolds
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,17 @@ class BlackScholesPricer:
         return PriceEstimate(value=float(value), standard_error=0.0, provenance="black-scholes")
 
 
+def _payoff_from_folds(payoff: Payoff, folds: PathFolds) -> torch.Tensor | None:
+    if isinstance(payoff, EuropeanCall):
+        return torch.clamp(folds.terminal - payoff.strike, min=0.0)
+    if isinstance(payoff, EuropeanPut):
+        return torch.clamp(payoff.strike - folds.terminal, min=0.0)
+    if isinstance(payoff, UpAndOutCall):
+        alive = (folds.running_max < payoff.barrier).to(folds.terminal.dtype)
+        return torch.clamp(folds.terminal - payoff.strike, min=0.0) * alive
+    return None
+
+
 @dataclass(frozen=True)
 class MonteCarloPricer:
     """Model-agnostic pricer by discounted Monte Carlo expectation.
@@ -105,6 +120,10 @@ class MonteCarloPricer:
     the pricer's rate over the simulator's maturity, so the estimate
     stays comparable with discounting closed forms away from the
     zero-rate path where the two would otherwise silently disagree.
+    When the simulator offers register-resident path folds and the
+    payoff is expressible from them, pricing skips the grid entirely;
+    the folds consume the same noise stream, so the two routes return
+    the same estimate.
 
     Attributes:
         n_paths: Number of simulated paths.
@@ -127,8 +146,14 @@ class MonteCarloPricer:
         Returns:
             The discounted sample mean with its standard error.
         """
-        state = simulator.simulate(self.n_paths, noise=NoiseSpec(seed=self.seed))
-        values = payoff(state.spot)
+        values: torch.Tensor | None = None
+        fold_source = getattr(simulator, "simulate_folds", None)
+        if fold_source is not None:
+            folds = fold_source(self.n_paths, noise=NoiseSpec(seed=self.seed))
+            values = _payoff_from_folds(payoff, folds)
+        if values is None:
+            state = simulator.simulate(self.n_paths, noise=NoiseSpec(seed=self.seed))
+            values = payoff(state.spot)
         discount = math.exp(-self.rate * simulator.maturity)
         mean = float(values.mean()) * discount
         spread = float(values.std()) / math.sqrt(self.n_paths) * discount

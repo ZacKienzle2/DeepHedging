@@ -83,6 +83,85 @@ __global__ void heston_kernel(
   }
 }
 
+__global__ void gbm_fold_kernel(
+    float* __restrict__ terminal,
+    float* __restrict__ running_max,
+    float* __restrict__ running_min,
+    const int64_t n_paths,
+    const int n_steps,
+    const float s0,
+    const float drift,
+    const float diffusion,
+    const uint64_t seed,
+    const uint64_t subsequence_base) {
+  const int64_t tid =
+      static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (tid >= n_paths) {
+    return;
+  }
+  curandStatePhilox4_32_10_t rng;
+  curand_init(seed, subsequence_base + static_cast<uint64_t>(tid), 0ULL, &rng);
+  float log_return = 0.0f;
+  float spot = s0;
+  float spot_max = s0;
+  float spot_min = s0;
+  for (int k = 0; k < n_steps; ++k) {
+    log_return += drift + diffusion * curand_normal(&rng);
+    spot = s0 * expf(log_return);
+    spot_max = fmaxf(spot_max, spot);
+    spot_min = fminf(spot_min, spot);
+  }
+  terminal[tid] = spot;
+  running_max[tid] = spot_max;
+  running_min[tid] = spot_min;
+}
+
+__global__ void heston_fold_kernel(
+    float* __restrict__ terminal,
+    float* __restrict__ running_max,
+    float* __restrict__ running_min,
+    const int64_t n_paths,
+    const int n_steps,
+    const float s0,
+    const float v0,
+    const float dt,
+    const float sqrt_dt,
+    const float kappa,
+    const float theta,
+    const float xi,
+    const float rho,
+    const float mu,
+    const uint64_t seed,
+    const uint64_t subsequence_base) {
+  const int64_t tid =
+      static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (tid >= n_paths) {
+    return;
+  }
+  curandStatePhilox4_32_10_t rng;
+  curand_init(seed, subsequence_base + static_cast<uint64_t>(tid), 0ULL, &rng);
+  const float rho_complement = sqrtf(1.0f - rho * rho);
+  float log_return = 0.0f;
+  float variance = v0;
+  float spot = s0;
+  float spot_max = s0;
+  float spot_min = s0;
+  for (int k = 0; k < n_steps; ++k) {
+    const float2 gauss = curand_normal2(&rng);
+    const float variance_plus = fmaxf(variance, 0.0f);
+    const float vol = sqrtf(variance_plus);
+    log_return += (mu - 0.5f * variance_plus) * dt + vol * sqrt_dt * gauss.x;
+    variance += kappa * (theta - variance_plus) * dt +
+                xi * vol * sqrt_dt * (rho * gauss.x + rho_complement * gauss.y);
+    spot = s0 * expf(log_return);
+    spot_max = fmaxf(spot_max, spot);
+    spot_min = fminf(spot_min, spot);
+  }
+  terminal[tid] = spot;
+  running_max[tid] = spot_max;
+  running_min[tid] = spot_min;
+}
+
 int64_t blocks_for(const int64_t n_paths) {
   return (n_paths + kThreads - 1) / kThreads;
 }
@@ -145,8 +224,63 @@ std::vector<torch::Tensor> heston_paths(
   return {spot, variance};
 }
 
+std::vector<torch::Tensor> gbm_folds(const int64_t n_paths,
+                                     const int64_t n_steps, const double s0,
+                                     const double mu, const double sigma,
+                                     const double maturity, const int64_t seed,
+                                     const int64_t stream) {
+  check_arguments(n_paths, n_steps, stream);
+  const auto options =
+      torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA);
+  auto terminal = torch::empty({n_paths}, options);
+  auto running_max = torch::empty({n_paths}, options);
+  auto running_min = torch::empty({n_paths}, options);
+  const double dt = maturity / static_cast<double>(n_steps);
+  const float drift = static_cast<float>((mu - 0.5 * sigma * sigma) * dt);
+  const float diffusion = static_cast<float>(sigma * std::sqrt(dt));
+  const uint64_t subsequence_base = static_cast<uint64_t>(stream) << 32;
+  gbm_fold_kernel<<<blocks_for(n_paths), kThreads, 0,
+                    at::cuda::getCurrentCUDAStream()>>>(
+      terminal.data_ptr<float>(), running_max.data_ptr<float>(),
+      running_min.data_ptr<float>(), n_paths, static_cast<int>(n_steps),
+      static_cast<float>(s0), drift, diffusion, static_cast<uint64_t>(seed),
+      subsequence_base);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return {terminal, running_max, running_min};
+}
+
+std::vector<torch::Tensor> heston_folds(
+    const int64_t n_paths, const int64_t n_steps, const double s0,
+    const double v0, const double kappa, const double theta, const double xi,
+    const double rho, const double mu, const double maturity,
+    const int64_t seed, const int64_t stream) {
+  check_arguments(n_paths, n_steps, stream);
+  const auto options =
+      torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA);
+  auto terminal = torch::empty({n_paths}, options);
+  auto running_max = torch::empty({n_paths}, options);
+  auto running_min = torch::empty({n_paths}, options);
+  const double dt = maturity / static_cast<double>(n_steps);
+  const uint64_t subsequence_base = static_cast<uint64_t>(stream) << 32;
+  heston_fold_kernel<<<blocks_for(n_paths), kThreads, 0,
+                       at::cuda::getCurrentCUDAStream()>>>(
+      terminal.data_ptr<float>(), running_max.data_ptr<float>(),
+      running_min.data_ptr<float>(), n_paths, static_cast<int>(n_steps),
+      static_cast<float>(s0), static_cast<float>(v0), static_cast<float>(dt),
+      static_cast<float>(std::sqrt(dt)), static_cast<float>(kappa),
+      static_cast<float>(theta), static_cast<float>(xi),
+      static_cast<float>(rho), static_cast<float>(mu),
+      static_cast<uint64_t>(seed), subsequence_base);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return {terminal, running_max, running_min};
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("gbm_paths", &gbm_paths, "Fused Philox GBM path generation");
   m.def("heston_paths", &heston_paths,
         "Fused Philox Heston path generation");
+  m.def("gbm_folds", &gbm_folds,
+        "Fused Philox GBM path-statistic folds without the grid");
+  m.def("heston_folds", &heston_folds,
+        "Fused Philox Heston path-statistic folds without the grid");
 }
