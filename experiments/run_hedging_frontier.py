@@ -95,6 +95,39 @@ def learned_band(policy: FeedForwardPolicy, tau: float) -> dict[str, list[float]
     }
 
 
+def band_probe(policy: FeedForwardPolicy, tau: float) -> dict[str, object]:
+    """Sweeps held inventory at the money to expose the no-trade band.
+
+    The no-trade band is the inventory interval the policy leaves in
+    place rather than rebalancing toward the model delta. Sweeping the
+    position input at fixed spot and time records the policy response
+    on a grid; the interval where the response stays near the input is
+    the band, and its width across cost levels tests the asymptotic
+    one-third power law of Whalley and Wilmott.
+
+    Args:
+        policy: The trained policy.
+        tau: Normalised time to maturity to probe at.
+
+    Returns:
+        The inventory grid, the policy response, and the model delta at
+        the money.
+    """
+    device = next(policy.parameters()).device
+    delta_atm = float(bs_call_delta(100.0, STRIKE, SIGMA, tau * MATURITY))
+    inventory = torch.linspace(delta_atm - 0.6, delta_atm + 0.6, 49, device=device)
+    log_moneyness = torch.zeros_like(inventory)
+    tau_column = torch.full_like(inventory, tau)
+    with torch.no_grad():
+        features = torch.stack((log_moneyness, tau_column, inventory), dim=-1)
+        response, _ = policy(features, None)
+    return {
+        "inventory": inventory.cpu().tolist(),
+        "response": response.cpu().tolist(),
+        "model_delta": delta_atm,
+    }
+
+
 def main() -> None:
     """Runs the frontier grid and prints the comparison table."""
     parser = argparse.ArgumentParser()
@@ -178,6 +211,7 @@ def main() -> None:
                     )
                 summary = pnl_summary(pnl)
                 band = learned_band(policy, tau=0.5)
+                probe = band_probe(policy, tau=0.5)
                 append_record(
                     results_path,
                     ExperimentRecord.from_run(
@@ -189,6 +223,7 @@ def main() -> None:
                             "alpha": alpha,
                             "eval_seed": EVAL_SEED,
                             "band": band,
+                            "band_probe": probe,
                             **summary,
                         },
                         result=result,
