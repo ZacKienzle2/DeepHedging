@@ -29,7 +29,7 @@ _MAX_STREAM = 1 << 32
 def _ensure_msvc_on_path() -> None:
     if os.name != "nt" or shutil.which("cl") is not None:
         return
-    program_files = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    program_files = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
     pattern = os.path.join(
         program_files,
         "Microsoft Visual Studio",
