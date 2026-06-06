@@ -112,6 +112,88 @@ def test_pnl_from_positions_contracts_asset_axis() -> None:
     assert torch.allclose(pnl, expected_gains - expected_costs, atol=1e-6)
 
 
+def test_multi_asset_loop_matches_vectorised_oracle() -> None:
+    from deephedging import MultiAssetFeatures
+    from deephedging.policies.base import HedgePolicy
+    from deephedging.training import hedge_pnl
+
+    class ConstantVectorPolicy(HedgePolicy):
+        def __init__(self, values: tuple[float, ...]) -> None:
+            super().__init__()
+            self.values = values
+
+        def forward(
+            self, features: torch.Tensor, state: torch.Tensor | None = None
+        ) -> tuple[torch.Tensor, torch.Tensor | None]:
+            row = features.new_tensor(self.values)
+            return row.expand(features.shape[0], len(self.values)), None
+
+    sim = _simulator(n_steps=12)
+    state = sim.simulate(256, noise=NoiseSpec(seed=61))
+    payoff = GeometricBasketCall(strike=100.0)
+    cost = ProportionalCost(rate=1e-3)
+    values = (0.4, -0.2, 0.7)
+    pnl_loop = hedge_pnl(
+        state,
+        ConstantVectorPolicy(values),
+        payoff,
+        cost,
+        premium=2.0,
+        liquidate_terminal=True,
+        feature_map=MultiAssetFeatures(n_assets=3),
+    )
+    positions = state.spot.new_tensor(values).expand(state.n_steps, state.n_paths, 3)
+    pnl_vec = pnl_from_positions(
+        state, positions, payoff, cost, premium=2.0, liquidate_terminal=True
+    )
+    assert torch.allclose(pnl_loop, pnl_vec, atol=1e-5)
+
+
+@pytest.mark.slow
+def test_multi_asset_training_beats_no_hedge() -> None:
+    from deephedging import CVaR, MultiAssetFeatures, TrainConfig, train
+    from deephedging.evaluation import expected_shortfall
+    from deephedging.frictions import NoCost
+    from deephedging.policies import FeedForwardPolicy
+    from deephedging.training import hedge_pnl
+
+    torch.manual_seed(67)
+    sim = CorrelatedGBMSimulator(
+        s0=100.0,
+        sigmas=(0.2, 0.3),
+        correlation=((1.0, 0.5), (0.5, 1.0)),
+        maturity=0.25,
+        n_steps=8,
+    )
+    payoff = GeometricBasketCall(strike=100.0)
+    premium = MonteCarloPricer(n_paths=200_000, seed=71).price(payoff, sim).value
+    feature_map = MultiAssetFeatures(n_assets=2)
+    policy = FeedForwardPolicy(
+        n_features=feature_map.n_features, hidden_sizes=(16, 16), n_outputs=2
+    )
+    config = TrainConfig(n_iterations=250, batch_paths=1024, lr=2e-3, seed=9)
+    train(
+        sim,
+        policy,
+        payoff,
+        NoCost(),
+        CVaR(alpha=0.9),
+        config,
+        premium=premium,
+        feature_map=feature_map,
+    )
+
+    eval_state = sim.simulate(50_000, noise=NoiseSpec(seed=73))
+    with torch.no_grad():
+        hedged = hedge_pnl(
+            eval_state, policy, payoff, NoCost(), premium=premium, feature_map=feature_map
+        )
+    unhedged = premium - payoff(eval_state.spot)
+    assert float(expected_shortfall(hedged, alpha=0.9)) < 0.6 * float(
+        expected_shortfall(unhedged, alpha=0.9)
+    )
+
+
 def test_invalid_correlation_rejected() -> None:
     with pytest.raises(ValueError):
         CorrelatedGBMSimulator(

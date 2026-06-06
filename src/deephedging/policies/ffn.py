@@ -17,21 +17,25 @@ class FeedForwardPolicy(HedgePolicy):
         self,
         n_features: int = 3,
         hidden_sizes: tuple[int, ...] = (32, 32),
+        n_outputs: int = 1,
     ) -> None:
         """Initialises the policy network.
 
         Args:
             n_features: Number of input features per path.
             hidden_sizes: Widths of the hidden layers.
+            n_outputs: Number of hedge positions per path; one output per
+                asset for multi-asset books.
         """
         super().__init__()
+        self.n_outputs = n_outputs
         layers: list[nn.Module] = []
         width = n_features
         for size in hidden_sizes:
             layers.append(nn.Linear(width, size))
             layers.append(nn.SiLU())
             width = size
-        layers.append(nn.Linear(width, 1))
+        layers.append(nn.Linear(width, n_outputs))
         self.net = nn.Sequential(*layers)
 
     def forward(
@@ -44,7 +48,11 @@ class FeedForwardPolicy(HedgePolicy):
             state: Ignored; present for interface compatibility.
 
         Returns:
-            Tuple of the position per path, shape ``(n_paths,)``, and
+            Tuple of the position per path, shape ``(n_paths,)`` for a
+            single output or ``(n_paths, n_outputs)`` otherwise, and
             ``None``.
         """
-        return self.net(features).squeeze(-1), None
+        output = self.net(features)
+        if self.n_outputs == 1:
+            return output.squeeze(-1), None
+        return output, None

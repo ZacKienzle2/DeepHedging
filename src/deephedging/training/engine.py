@@ -29,7 +29,8 @@ def hedge_pnl(
     the policy maps the feature-map output to a position, trading gains
     accumulate as ``pos_t * (S_{t+1} - S_t)``, and transaction costs are
     charged on every position change including the initial trade from a
-    flat book.
+    flat book. With a trailing asset axis on the spot grid the policy
+    emits one position per asset and gains and costs contract that axis.
 
     Args:
         state: Simulated market state.
@@ -60,9 +61,13 @@ def hedge_pnl(
     paths = state.spot
     n_steps = state.n_steps
     n_paths = state.n_paths
+
+    def per_path(values: torch.Tensor) -> torch.Tensor:
+        return values.sum(dim=-1) if values.dim() == 2 else values
+
     features_of = feature_map if feature_map is not None else DefaultFeatures()
     taus = torch.arange(n_steps, 0, -1, dtype=paths.dtype, device=paths.device) / n_steps
-    position = paths.new_zeros(n_paths)
+    position = paths.new_zeros(paths.shape[1:])
     pnl = paths.new_zeros(n_paths) + premium
     hidden: torch.Tensor | None = None
     use_checkpoint = checkpoint_steps and torch.is_grad_enabled()
@@ -77,10 +82,14 @@ def hedge_pnl(
             else:
                 new_position, hidden = policy(features, hidden)
         new_position = new_position.to(paths.dtype)
-        pnl = pnl + new_position * (paths[t + 1] - spot) - cost_model(new_position - position, spot)
+        pnl = (
+            pnl
+            + per_path(new_position * (paths[t + 1] - spot))
+            - per_path(cost_model(new_position - position, spot))
+        )
         position = new_position
     if liquidate_terminal:
-        pnl = pnl - cost_model(position, paths[-1])
+        pnl = pnl - per_path(cost_model(position, paths[-1]))
     return pnl - payoff(paths)
 
 

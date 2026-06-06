@@ -31,6 +31,7 @@ from deephedging.evaluation import (
 from deephedging.features import (
     DefaultFeatures,
     FeatureMap,
+    MultiAssetFeatures,
     RunningMaxFeatures,
     VarianceFeatures,
 )
@@ -87,6 +88,7 @@ __all__ = [
     "HestonSimulator",
     "MarketState",
     "MonteCarloPricer",
+    "MultiAssetFeatures",
     "NoCost",
     "NoiseSpec",
     "PathAccumulator",

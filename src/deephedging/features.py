@@ -113,6 +113,46 @@ class RunningMaxFeatures:
 
 
 @dataclass(frozen=True)
+class MultiAssetFeatures:
+    """Per-asset log moneyness and positions plus time to maturity.
+
+    For a trailing-asset spot grid the observation concatenates one log
+    moneyness and one held position per asset around the shared time
+    feature, so the policy sees the joint cross-sectional state its
+    vector position must respond to.
+
+    Attributes:
+        n_assets: Number of assets on the spot grid.
+    """
+
+    n_assets: int
+
+    @property
+    def n_features(self) -> int:
+        """Width of the produced feature vector."""
+        return 2 * self.n_assets + 1
+
+    def __call__(
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
+    ) -> torch.Tensor:
+        """Computes the cross-sectional feature block.
+
+        Args:
+            state: Simulated market state with a trailing asset axis.
+            t: Index of the current rebalancing date.
+            tau: Scalar tensor, normalised time to maturity at ``t``.
+            position: Positions held entering ``t``, shape
+                ``(n_paths, n_assets)``.
+
+        Returns:
+            Features of shape ``(n_paths, 2 * n_assets + 1)``.
+        """
+        log_moneyness = state.log_relative(t)
+        n_paths = log_moneyness.shape[0]
+        return torch.cat((log_moneyness, tau.expand(n_paths, 1), position), dim=-1)
+
+
+@dataclass(frozen=True)
 class VarianceFeatures:
     """Baseline features plus the instantaneous variance channel.
 
