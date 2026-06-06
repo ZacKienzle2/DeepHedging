@@ -58,7 +58,12 @@ from deephedging.market import (
     TiltedGBMSimulator,
 )
 from deephedging.market.local_vol import LocalVolSimulator
-from deephedging.policies import FeedForwardPolicy, HedgePolicy, RecurrentPolicy
+from deephedging.policies import (
+    FeedForwardPolicy,
+    HedgePolicy,
+    NoTransactionBandPolicy,
+    RecurrentPolicy,
+)
 from deephedging.pricing import (
     BlackScholesPricer,
     MonteCarloPricer,
@@ -99,6 +104,7 @@ __all__ = [
     "MonteCarloPricer",
     "MultiAssetFeatures",
     "NoCost",
+    "NoTransactionBandPolicy",
     "NoiseSpec",
     "PathAccumulator",
     "Payoff",
