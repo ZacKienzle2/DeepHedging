@@ -26,6 +26,7 @@ from deephedging.evaluation import (
     bs_put_price,
     delta_hedge_positions,
     expected_shortfall,
+    merton_call_price,
     pnl_summary,
 )
 from deephedging.features import (
@@ -49,6 +50,7 @@ from deephedging.market import (
     GBMSimulator,
     HestonSimulator,
     MarketState,
+    MertonSimulator,
     NoiseSpec,
     PathSimulator,
 )
@@ -87,6 +89,7 @@ __all__ = [
     "HedgePolicy",
     "HestonSimulator",
     "MarketState",
+    "MertonSimulator",
     "MonteCarloPricer",
     "MultiAssetFeatures",
     "NoCost",
@@ -113,6 +116,7 @@ __all__ = [
     "expected_shortfall",
     "fold_path",
     "hedge_pnl",
+    "merton_call_price",
     "pnl_from_positions",
     "pnl_summary",
     "train",

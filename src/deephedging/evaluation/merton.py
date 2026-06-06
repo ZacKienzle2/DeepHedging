@@ -39,7 +39,13 @@ def merton_call_price(
 
     Returns:
         Scalar call price in float64.
+
+    Raises:
+        ValueError: If both volatilities vanish, leaving the zero-jump
+            term without a defined Black-Scholes price.
     """
+    if sigma <= 0.0 and jump_vol <= 0.0:
+        raise ValueError("sigma and jump_vol cannot both be zero")
     mean_jump_size = math.exp(jump_mean + 0.5 * jump_vol**2) - 1.0
     total = torch.zeros((), dtype=torch.float64)
     log_weight_base = -jump_intensity * tau
