@@ -13,6 +13,7 @@ from deephedging.market.merton import MertonSimulator
 from deephedging.market.noise import NoiseSpec
 from deephedging.market.state import MarketState, PathFolds
 from deephedging.market.tilted import TiltedGBMSimulator
+from deephedging.market.variance_swap import HestonVarianceSwapSimulator
 
 __all__ = [
     "CorrelatedGBMSimulator",
@@ -20,6 +21,7 @@ __all__ = [
     "CudaHestonSimulator",
     "GBMSimulator",
     "HestonSimulator",
+    "HestonVarianceSwapSimulator",
     "MarketState",
     "MertonSimulator",
     "NoiseSpec",
