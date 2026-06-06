@@ -8,11 +8,12 @@ from torch.utils.checkpoint import checkpoint
 from deephedging.features import DefaultFeatures, FeatureMap
 from deephedging.frictions.base import CostModel
 from deephedging.instruments.base import Payoff
+from deephedging.market.state import MarketState
 from deephedging.policies.base import HedgePolicy
 
 
 def hedge_pnl(
-    paths: torch.Tensor,
+    state: MarketState,
     policy: HedgePolicy,
     payoff: Payoff,
     cost_model: CostModel,
@@ -23,14 +24,14 @@ def hedge_pnl(
 ) -> torch.Tensor:
     """Computes the terminal PnL of a self-financed hedge along paths.
 
-    Runs the sequential time-major episode loop: at each rebalancing date the
-    policy maps the feature-map output (by default log moneyness, time to
-    maturity, and previous position) to a position, trading gains accumulate
-    as ``pos_t * (S_{t+1} - S_t)``, and transaction costs are charged on
-    every position change including the initial trade from a flat book.
+    Runs the sequential time-major episode loop. At each rebalancing date
+    the policy maps the feature-map output to a position, trading gains
+    accumulate as ``pos_t * (S_{t+1} - S_t)``, and transaction costs are
+    charged on every position change including the initial trade from a
+    flat book.
 
     Args:
-        paths: Price paths of shape ``(n_steps + 1, n_paths)``.
+        state: Simulated market state.
         policy: Hedging policy network.
         payoff: Liability payoff, charged at maturity.
         cost_model: Transaction cost model.
@@ -46,22 +47,23 @@ def hedge_pnl(
     Returns:
         PnL per path of shape ``(n_paths,)``; positive is profit.
     """
-    n_steps = paths.shape[0] - 1
-    n_paths = paths.shape[1]
+    paths = state.spot
+    n_steps = state.n_steps
+    n_paths = state.n_paths
     features_of = feature_map if feature_map is not None else DefaultFeatures()
     taus = torch.arange(n_steps, 0, -1, dtype=paths.dtype, device=paths.device) / n_steps
     position = paths.new_zeros(n_paths)
     pnl = paths.new_zeros(n_paths) + premium
-    state: torch.Tensor | None = None
+    hidden: torch.Tensor | None = None
     use_checkpoint = checkpoint_steps and torch.is_grad_enabled()
     for t in range(n_steps):
         spot = paths[t]
-        features = features_of(paths, t, taus[t], position)
+        features = features_of(state, t, taus[t], position)
         if use_checkpoint:
-            output = checkpoint(policy, features, state, use_reentrant=False)
-            new_position, state = cast(tuple[torch.Tensor, torch.Tensor | None], output)
+            output = checkpoint(policy, features, hidden, use_reentrant=False)
+            new_position, hidden = cast(tuple[torch.Tensor, torch.Tensor | None], output)
         else:
-            new_position, state = policy(features, state)
+            new_position, hidden = policy(features, hidden)
         pnl = pnl + new_position * (paths[t + 1] - spot) - cost_model(new_position - position, spot)
         position = new_position
     if liquidate_terminal:
@@ -70,7 +72,7 @@ def hedge_pnl(
 
 
 def pnl_from_positions(
-    paths: torch.Tensor,
+    state: MarketState,
     positions: torch.Tensor,
     payoff: Payoff,
     cost_model: CostModel,
@@ -84,7 +86,7 @@ def pnl_from_positions(
     cross-validation oracle for :func:`hedge_pnl`.
 
     Args:
-        paths: Price paths of shape ``(n_steps + 1, n_paths)``.
+        state: Simulated market state.
         positions: Hedge positions of shape ``(n_steps, n_paths)``; row ``t``
             is held over the interval ``[t, t + 1)``.
         payoff: Liability payoff, charged at maturity.
@@ -96,6 +98,7 @@ def pnl_from_positions(
     Returns:
         PnL per path of shape ``(n_paths,)``; positive is profit.
     """
+    paths = state.spot
     gains = (positions * (paths[1:] - paths[:-1])).sum(dim=0)
     initial = positions.new_zeros((1, positions.shape[1]))
     trades = torch.diff(positions, dim=0, prepend=initial)

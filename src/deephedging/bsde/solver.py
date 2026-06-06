@@ -15,6 +15,7 @@ import torch
 from torch import nn
 
 from deephedging.bsde.problem import BSDEProblem
+from deephedging.market.noise import NoiseSpec
 
 
 class DeepBSDESolver(nn.Module):
@@ -50,20 +51,21 @@ class DeepBSDESolver(nn.Module):
         self.z_net = nn.Sequential(*layers)
 
     def forward(
-        self, problem: BSDEProblem, n_paths: int, generator: torch.Generator | None = None
+        self, problem: BSDEProblem, n_paths: int, noise: NoiseSpec | None = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Simulates the coupled forward-backward system.
 
         Args:
             problem: The BSDE problem to integrate.
             n_paths: Number of Monte Carlo paths.
-            generator: Optional RNG for reproducible draws.
+            noise: Optional addressable noise stream for exact replay.
 
         Returns:
             Tuple of ``Y_T`` and ``g(X_T)``, each of shape ``(n_paths,)``.
         """
         device = self.y0.device
         dtype = self.y0.dtype
+        generator = noise.torch_generator(device) if noise is not None else None
         dt = problem.maturity / problem.n_steps
         sqrt_dt = math.sqrt(dt)
         dw = torch.randn(
@@ -98,7 +100,8 @@ class BSDEConfig:
         lr: Learning rate for the ``Z`` network.
         y0_lr: Learning rate for the scalar ``Y_0``; defaults to ``10 * lr``
             so the price estimate tracks faster than the hedge surface.
-        seed: Optional seed for reproducible path generation.
+        seed: Optional experiment seed; each iteration draws from its own
+            addressable noise stream, so any single batch can be replayed.
     """
 
     n_iterations: int = 1500
@@ -146,13 +149,13 @@ def train_bsde(
     """
     if solver.dim != problem.dim:
         raise ValueError(f"solver dim {solver.dim} != problem dim {problem.dim}")
-    device = solver.y0.device
-    generator: torch.Generator | None = None
-    if config.seed is not None:
-        generator = torch.Generator(device=device)
-        generator.manual_seed(config.seed)
+    base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
+
+    def batch_noise(index: int) -> NoiseSpec | None:
+        return base_noise.child(index) if base_noise is not None else None
+
     with torch.no_grad():
-        _, terminal = solver(problem, config.batch_paths, generator=generator)
+        _, terminal = solver(problem, config.batch_paths, noise=batch_noise(0))
         solver.y0.copy_(terminal.mean())
     y0_lr = config.y0_lr if config.y0_lr is not None else 10.0 * config.lr
     optimizer = torch.optim.Adam(
@@ -162,8 +165,8 @@ def train_bsde(
         ]
     )
     loss_history: list[torch.Tensor] = []
-    for _ in range(config.n_iterations):
-        y_terminal, target = solver(problem, config.batch_paths, generator=generator)
+    for iteration in range(config.n_iterations):
+        y_terminal, target = solver(problem, config.batch_paths, noise=batch_noise(iteration + 1))
         loss = torch.mean((y_terminal - target) ** 2)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()

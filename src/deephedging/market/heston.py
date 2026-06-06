@@ -5,6 +5,9 @@ from dataclasses import dataclass
 
 import torch
 
+from deephedging.market.noise import NoiseSpec
+from deephedging.market.state import MarketState
+
 
 @dataclass(frozen=True)
 class HestonSimulator:
@@ -16,7 +19,9 @@ class HestonSimulator:
     clamps the variance at zero inside both drift and diffusion, which is
     the standard bias-minimising discretisation when the Feller condition
     ``2 kappa theta >= xi^2`` is violated. The price state is evolved in
-    log space, matching the precision contract of the GBM simulator.
+    log space, matching the precision contract of the GBM simulator. The
+    clamped variance path is exposed as the ``variance`` channel so
+    volatility-aware feature maps can observe it.
 
     Attributes:
         s0: Initial spot price.
@@ -62,17 +67,18 @@ class HestonSimulator:
         if self.n_steps < 1:
             raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
 
-    def simulate(self, n_paths: int, generator: torch.Generator | None = None) -> torch.Tensor:
-        """Simulates Heston price paths.
+    def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
+        """Simulates Heston market paths.
 
         Args:
             n_paths: Number of independent paths.
-            generator: Optional RNG for reproducible draws.
+            noise: Optional addressable noise stream for exact replay.
 
         Returns:
-            Price paths of shape ``(n_steps + 1, n_paths)`` with
-            ``paths[0] == s0``.
+            Market state whose spot grid satisfies ``spot[0] == s0`` and
+            whose ``variance`` channel holds the clamped variance path.
         """
+        generator = noise.torch_generator(self.device) if noise is not None else None
         dt = self.maturity / self.n_steps
         sqrt_dt = dt**0.5
         z = torch.randn(
@@ -86,7 +92,9 @@ class HestonSimulator:
         log_return = torch.zeros((n_paths,), dtype=self.dtype, device=self.device)
         variance = torch.full((n_paths,), self.v0, dtype=self.dtype, device=self.device)
         out = torch.empty((self.n_steps + 1, n_paths), dtype=self.dtype, device=self.device)
+        var_out = torch.empty_like(out)
         out[0] = 0.0
+        var_out[0] = variance
         for k in range(self.n_steps):
             variance_plus = torch.clamp(variance, min=0.0)
             vol = torch.sqrt(variance_plus)
@@ -99,4 +107,5 @@ class HestonSimulator:
                 + self.xi * vol * sqrt_dt * z_var[k]
             )
             out[k + 1] = log_return
-        return out.exp_().mul_(self.s0)
+            var_out[k + 1] = torch.clamp(variance, min=0.0)
+        return MarketState(spot=out.exp_().mul_(self.s0), aux={"variance": var_out})

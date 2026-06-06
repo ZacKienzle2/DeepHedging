@@ -22,10 +22,21 @@ from deephedging.evaluation import (
     expected_shortfall,
     pnl_summary,
 )
-from deephedging.features import DefaultFeatures, FeatureMap, RunningMaxFeatures
+from deephedging.features import (
+    DefaultFeatures,
+    FeatureMap,
+    RunningMaxFeatures,
+    VarianceFeatures,
+)
 from deephedging.frictions import CostModel, NoCost, ProportionalCost
 from deephedging.instruments import EuropeanCall, EuropeanPut, Payoff, UpAndOutCall
-from deephedging.market import GBMSimulator, HestonSimulator, PathSimulator
+from deephedging.market import (
+    GBMSimulator,
+    HestonSimulator,
+    MarketState,
+    NoiseSpec,
+    PathSimulator,
+)
 from deephedging.policies import FeedForwardPolicy, HedgePolicy, RecurrentPolicy
 from deephedging.risk import CVaR, Entropic, RiskMeasure
 from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, train
@@ -49,7 +60,9 @@ __all__ = [
     "GBMSimulator",
     "HedgePolicy",
     "HestonSimulator",
+    "MarketState",
     "NoCost",
+    "NoiseSpec",
     "Payoff",
     "PathSimulator",
     "ProportionalCost",
@@ -58,6 +71,7 @@ __all__ = [
     "RunningMaxFeatures",
     "TrainConfig",
     "UpAndOutCall",
+    "VarianceFeatures",
     "ZeroGenerator",
     "bs_call_delta",
     "bs_call_price",

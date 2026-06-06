@@ -8,6 +8,8 @@ from deephedging.features import FeatureMap
 from deephedging.frictions.base import CostModel
 from deephedging.instruments.base import Payoff
 from deephedging.market.base import PathSimulator
+from deephedging.market.noise import NoiseSpec
+from deephedging.market.state import MarketState
 from deephedging.policies.base import HedgePolicy
 from deephedging.risk.base import RiskMeasure
 from deephedging.training.engine import hedge_pnl
@@ -27,7 +29,8 @@ class TrainConfig:
             threshold); defaults to ``10 * lr`` for a faster timescale so the
             threshold tracks the moving quantile and keeps the policy
             gradient close to the true CVaR gradient.
-        seed: Optional seed for reproducible path generation.
+        seed: Optional experiment seed; each iteration draws from its own
+            addressable noise stream, so any single batch can be replayed.
         checkpoint_steps: Whether to gradient-checkpoint the episode loop.
         liquidate_terminal: Whether episodes charge terminal liquidation.
     """
@@ -64,8 +67,10 @@ def train(
 ) -> TrainResult:
     """Trains a hedging policy by SGD on a convex risk measure.
 
-    Paths are generated on the fly per iteration: data is unbounded, nothing
-    is stored, and no overfitting to a fixed dataset is possible.
+    Paths are generated on the fly per iteration. Data is unbounded,
+    nothing is stored, and no overfitting to a fixed dataset is possible.
+    The risk measure warm-starts its auxiliary state on an initial batch so
+    early iterations optimise the intended objective.
 
     Args:
         simulator: Market path simulator.
@@ -81,10 +86,12 @@ def train(
         The recorded training losses.
     """
     device = next(policy.parameters()).device
-    generator: torch.Generator | None = None
-    if config.seed is not None:
-        generator = torch.Generator(device=simulator.device)
-        generator.manual_seed(config.seed)
+    base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
+
+    def batch_state(index: int) -> MarketState:
+        noise = base_noise.child(index) if base_noise is not None else None
+        return simulator.simulate(config.batch_paths, noise=noise).to(device)
+
     param_groups: list[dict[str, object]] = [{"params": list(policy.parameters()), "lr": config.lr}]
     risk_params = list(risk_measure.parameters())
     if risk_params:
@@ -92,9 +99,8 @@ def train(
         param_groups.append({"params": risk_params, "lr": risk_lr})
     optimizer = torch.optim.Adam(param_groups)
     with torch.no_grad():
-        warmup_paths = simulator.simulate(config.batch_paths, generator=generator).to(device)
         warmup_pnl = hedge_pnl(
-            warmup_paths,
+            batch_state(0),
             policy,
             payoff,
             cost_model,
@@ -104,10 +110,9 @@ def train(
         )
         risk_measure.warm_start(-warmup_pnl)
     loss_history: list[torch.Tensor] = []
-    for _ in range(config.n_iterations):
-        paths = simulator.simulate(config.batch_paths, generator=generator).to(device)
+    for iteration in range(config.n_iterations):
         pnl = hedge_pnl(
-            paths,
+            batch_state(iteration + 1),
             policy,
             payoff,
             cost_model,

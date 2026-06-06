@@ -4,6 +4,9 @@ from dataclasses import dataclass
 
 import torch
 
+from deephedging.market.noise import NoiseSpec
+from deephedging.market.state import MarketState
+
 
 @dataclass(frozen=True)
 class GBMSimulator:
@@ -42,17 +45,17 @@ class GBMSimulator:
         if self.n_steps < 1:
             raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
 
-    def simulate(self, n_paths: int, generator: torch.Generator | None = None) -> torch.Tensor:
-        """Simulates GBM price paths.
+    def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
+        """Simulates GBM market paths.
 
         Args:
             n_paths: Number of independent paths.
-            generator: Optional RNG for reproducible draws.
+            noise: Optional addressable noise stream for exact replay.
 
         Returns:
-            Price paths of shape ``(n_steps + 1, n_paths)`` with
-            ``paths[0] == s0``.
+            Market state whose spot grid satisfies ``spot[0] == s0``.
         """
+        generator = noise.torch_generator(self.device) if noise is not None else None
         dt = self.maturity / self.n_steps
         drift = (self.mu - 0.5 * self.sigma**2) * dt
         diffusion = self.sigma * dt**0.5
@@ -66,4 +69,4 @@ class GBMSimulator:
         out = log_returns.new_empty((self.n_steps + 1, n_paths))
         out[0] = 0.0
         out[1:] = log_returns
-        return out.exp_().mul_(self.s0)
+        return MarketState(spot=out.exp_().mul_(self.s0))

@@ -1,9 +1,11 @@
 """Observation construction for hedging policies.
 
 The feature map owns what the policy sees at each rebalancing date,
-decoupling observation design from the episode engine: path-functional
-features (running extrema, realised variance) and model-specific state
-slot in without touching the engine or the policies.
+decoupling observation design from the episode engine. Path-functional
+features and model-specific channels slot in without touching the engine
+or the policies. Implementations must only read information available at
+the current date because the policy is adapted and future prices must
+never leak into its input.
 """
 
 from dataclasses import dataclass
@@ -11,10 +13,12 @@ from typing import Protocol, runtime_checkable
 
 import torch
 
+from deephedging.market.state import MarketState
+
 
 @runtime_checkable
 class FeatureMap(Protocol):
-    """Builds the per-step policy input from the path history."""
+    """Builds the per-step policy input from the market state."""
 
     @property
     def n_features(self) -> int:
@@ -22,15 +26,12 @@ class FeatureMap(Protocol):
         ...
 
     def __call__(
-        self, paths: torch.Tensor, t: int, tau: torch.Tensor, position: torch.Tensor
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
     ) -> torch.Tensor:
         """Computes features for rebalancing date ``t``.
 
-        Implementations must only read ``paths[: t + 1]``: the policy is
-        adapted, and future prices must never leak into its input.
-
         Args:
-            paths: Price paths of shape ``(n_steps + 1, n_paths)``.
+            state: Simulated market state.
             t: Index of the current rebalancing date.
             tau: Scalar tensor, normalised time to maturity at ``t``.
             position: Position held entering ``t``, shape ``(n_paths,)``.
@@ -43,7 +44,7 @@ class FeatureMap(Protocol):
 
 @dataclass(frozen=True)
 class DefaultFeatures:
-    """Markovian baseline: log moneyness, time to maturity, position."""
+    """Markovian baseline. Log moneyness, time to maturity, position."""
 
     @property
     def n_features(self) -> int:
@@ -51,12 +52,12 @@ class DefaultFeatures:
         return 3
 
     def __call__(
-        self, paths: torch.Tensor, t: int, tau: torch.Tensor, position: torch.Tensor
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
     ) -> torch.Tensor:
         """Computes the baseline feature triple.
 
         Args:
-            paths: Price paths of shape ``(n_steps + 1, n_paths)``.
+            state: Simulated market state.
             t: Index of the current rebalancing date.
             tau: Scalar tensor, normalised time to maturity at ``t``.
             position: Position held entering ``t``, shape ``(n_paths,)``.
@@ -64,9 +65,9 @@ class DefaultFeatures:
         Returns:
             Features of shape ``(n_paths, 3)``.
         """
-        spot = paths[t]
+        spot = state.spot[t]
         n_paths = spot.shape[0]
-        return torch.stack((torch.log(spot / paths[0]), tau.expand(n_paths), position), dim=-1)
+        return torch.stack((torch.log(spot / state.spot[0]), tau.expand(n_paths), position), dim=-1)
 
 
 @dataclass(frozen=True)
@@ -74,10 +75,9 @@ class RunningMaxFeatures:
     """Baseline features plus the normalised running maximum.
 
     The running maximum is the sufficient path statistic for up-and-out
-    contracts: the policy can learn to stop hedging once the barrier is
-    breached. Recomputes the maximum from the prefix each step, costing
-    ``O(T^2)`` over an episode; acceptable for the research engine, a
-    running accumulator in the fused CUDA generator later.
+    contracts. The policy can learn to stop hedging once the barrier is
+    breached. The cumulative maximum is computed once and cached on the
+    state, so an episode pays ``O(T)`` rather than ``O(T^2)``.
     """
 
     @property
@@ -86,12 +86,12 @@ class RunningMaxFeatures:
         return 4
 
     def __call__(
-        self, paths: torch.Tensor, t: int, tau: torch.Tensor, position: torch.Tensor
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
     ) -> torch.Tensor:
         """Computes baseline features plus log running maximum.
 
         Args:
-            paths: Price paths of shape ``(n_steps + 1, n_paths)``.
+            state: Simulated market state.
             t: Index of the current rebalancing date.
             tau: Scalar tensor, normalised time to maturity at ``t``.
             position: Position held entering ``t``, shape ``(n_paths,)``.
@@ -99,15 +99,60 @@ class RunningMaxFeatures:
         Returns:
             Features of shape ``(n_paths, 4)``.
         """
-        spot = paths[t]
+        spot = state.spot[t]
         n_paths = spot.shape[0]
-        running_max = paths[: t + 1].max(dim=0).values
         return torch.stack(
             (
-                torch.log(spot / paths[0]),
+                torch.log(spot / state.spot[0]),
                 tau.expand(n_paths),
                 position,
-                torch.log(running_max / paths[0]),
+                torch.log(state.running_max(t) / state.spot[0]),
+            ),
+            dim=-1,
+        )
+
+
+@dataclass(frozen=True)
+class VarianceFeatures:
+    """Baseline features plus the instantaneous variance channel.
+
+    Requires a simulator that exposes a ``variance`` channel, such as
+    :class:`~deephedging.market.HestonSimulator`. Variance is the state
+    variable a stochastic volatility hedge must condition on; without it
+    the policy cannot distinguish calm from stressed regimes at the same
+    spot level.
+    """
+
+    @property
+    def n_features(self) -> int:
+        """Width of the produced feature vector."""
+        return 4
+
+    def __call__(
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
+    ) -> torch.Tensor:
+        """Computes baseline features plus instantaneous variance.
+
+        Args:
+            state: Simulated market state.
+            t: Index of the current rebalancing date.
+            tau: Scalar tensor, normalised time to maturity at ``t``.
+            position: Position held entering ``t``, shape ``(n_paths,)``.
+
+        Returns:
+            Features of shape ``(n_paths, 4)``.
+
+        Raises:
+            KeyError: If the state carries no ``variance`` channel.
+        """
+        spot = state.spot[t]
+        n_paths = spot.shape[0]
+        return torch.stack(
+            (
+                torch.log(spot / state.spot[0]),
+                tau.expand(n_paths),
+                position,
+                state.aux["variance"][t],
             ),
             dim=-1,
         )

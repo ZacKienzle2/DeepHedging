@@ -4,14 +4,12 @@ import pytest
 import torch
 
 from deephedging.instruments import EuropeanCall, UpAndOutCall
-from deephedging.market import GBMSimulator
+from deephedging.market import GBMSimulator, NoiseSpec
 
 
 def _paths(n_paths: int = 50_000, seed: int = 23) -> torch.Tensor:
-    generator = torch.Generator()
-    generator.manual_seed(seed)
     sim = GBMSimulator(s0=100.0, sigma=0.3, maturity=1.0, n_steps=50)
-    return sim.simulate(n_paths, generator=generator)
+    return sim.simulate(n_paths, noise=NoiseSpec(seed=seed)).spot
 
 
 def test_unreachable_barrier_equals_vanilla() -> None:

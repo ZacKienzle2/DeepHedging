@@ -1,6 +1,6 @@
 """End-to-end training smoke tests.
 
-Assertions are statistical relationships, not bitwise goldens: a trained
+Assertions are statistical relationships, not bitwise goldens. A trained
 policy must beat not hedging, and the recorded objective must improve.
 """
 
@@ -10,7 +10,7 @@ import torch
 from deephedging.evaluation import bs_call_price, expected_shortfall
 from deephedging.frictions import NoCost, ProportionalCost
 from deephedging.instruments import EuropeanCall
-from deephedging.market import GBMSimulator
+from deephedging.market import GBMSimulator, NoiseSpec
 from deephedging.policies import FeedForwardPolicy
 from deephedging.risk import CVaR
 from deephedging.training import TrainConfig, hedge_pnl, train
@@ -27,12 +27,10 @@ def test_trained_policy_beats_no_hedge() -> None:
     config = TrainConfig(n_iterations=300, batch_paths=1024, lr=2e-3, seed=4)
     result = train(sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config, premium=premium)
 
-    generator = torch.Generator()
-    generator.manual_seed(99)
-    eval_paths = sim.simulate(50_000, generator=generator)
+    eval_state = sim.simulate(50_000, noise=NoiseSpec(seed=99))
     with torch.no_grad():
-        hedged = hedge_pnl(eval_paths, policy, payoff, NoCost(), premium=premium)
-    unhedged = premium - payoff(eval_paths)
+        hedged = hedge_pnl(eval_state, policy, payoff, NoCost(), premium=premium)
+    unhedged = premium - payoff(eval_state.spot)
 
     es_hedged = float(expected_shortfall(hedged, alpha=0.9))
     es_unhedged = float(expected_shortfall(unhedged, alpha=0.9))

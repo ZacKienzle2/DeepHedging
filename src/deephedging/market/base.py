@@ -2,17 +2,19 @@
 
 from typing import Protocol, runtime_checkable
 
-import torch
+from deephedging.market.noise import NoiseSpec
+from deephedging.market.state import MarketState
 
 
 @runtime_checkable
 class PathSimulator(Protocol):
-    """Generates asset price paths in time-major layout.
+    """Generates market paths in time-major layout.
 
-    Implementations return tensors of shape ``(n_steps + 1, n_paths)`` so that
-    the per-step slice consumed by a sequential hedging policy is contiguous.
-    The time-major layout coalesces the access pattern executed once per
-    rebalancing date, which dominates the once-per-episode payoff reduction.
+    Implementations return a :class:`MarketState` whose spot grid has shape
+    ``(n_steps + 1, n_paths)`` so that the per-step slice consumed by a
+    sequential hedging policy is contiguous. The time-major layout
+    coalesces the access pattern executed once per rebalancing date, which
+    dominates the once-per-episode payoff reduction.
     """
 
     @property
@@ -30,14 +32,14 @@ class PathSimulator(Protocol):
         """Device on which paths are generated."""
         ...
 
-    def simulate(self, n_paths: int, generator: torch.Generator | None = None) -> torch.Tensor:
-        """Simulates price paths.
+    def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
+        """Simulates market paths.
 
         Args:
             n_paths: Number of independent paths.
-            generator: Optional RNG for reproducible draws.
+            noise: Optional addressable noise stream for exact replay.
 
         Returns:
-            Price paths of shape ``(n_steps + 1, n_paths)``.
+            Market state with spot grid ``(n_steps + 1, n_paths)``.
         """
         ...
