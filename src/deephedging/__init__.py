@@ -4,6 +4,12 @@ Neural hedging policies trained against convex risk measures over simulated
 market paths under realistic frictions.
 """
 
+from deephedging.accumulators import (
+    BarrierAliveAccumulator,
+    PathAccumulator,
+    RunningMaxAccumulator,
+    fold_path,
+)
 from deephedging.bsde import (
     BSDEConfig,
     BSDEProblem,
@@ -38,6 +44,12 @@ from deephedging.market import (
     PathSimulator,
 )
 from deephedging.policies import FeedForwardPolicy, HedgePolicy, RecurrentPolicy
+from deephedging.pricing import (
+    BlackScholesPricer,
+    MonteCarloPricer,
+    PriceEstimate,
+    Pricer,
+)
 from deephedging.risk import CVaR, Entropic, RiskMeasure
 from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, train
 
@@ -47,6 +59,8 @@ __all__ = [
     "BSDEConfig",
     "BSDEProblem",
     "BSDEResult",
+    "BarrierAliveAccumulator",
+    "BlackScholesPricer",
     "CVaR",
     "CostModel",
     "DeepBSDESolver",
@@ -61,12 +75,17 @@ __all__ = [
     "HedgePolicy",
     "HestonSimulator",
     "MarketState",
+    "MonteCarloPricer",
     "NoCost",
     "NoiseSpec",
+    "PathAccumulator",
     "Payoff",
     "PathSimulator",
+    "PriceEstimate",
+    "Pricer",
     "ProportionalCost",
     "RecurrentPolicy",
+    "RunningMaxAccumulator",
     "RiskMeasure",
     "RunningMaxFeatures",
     "TrainConfig",
@@ -79,6 +98,7 @@ __all__ = [
     "bs_put_price",
     "delta_hedge_positions",
     "expected_shortfall",
+    "fold_path",
     "hedge_pnl",
     "pnl_from_positions",
     "pnl_summary",

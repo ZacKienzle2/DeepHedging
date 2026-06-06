@@ -57,3 +57,33 @@ def test_training_is_reproducible_with_seed() -> None:
     first, second = run(), run()
     assert len(first) == len(second) == config.n_iterations
     assert all(abs(a - b) < 1e-6 for a, b in zip(first, second, strict=True))
+
+
+@pytest.mark.slow
+def test_compiled_policy_trains() -> None:
+    sigma, maturity, strike = 0.2, 0.25, 100.0
+    sim = GBMSimulator(s0=100.0, sigma=sigma, maturity=maturity, n_steps=5)
+    payoff = EuropeanCall(strike=strike)
+    config = TrainConfig(n_iterations=5, batch_paths=256, seed=8, compile_policy=True)
+    torch.manual_seed(42)
+    policy = FeedForwardPolicy(hidden_sizes=(8,))
+    try:
+        result = train(sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config)
+    except RuntimeError as error:
+        pytest.skip(f"torch.compile toolchain unavailable: {error}")
+    assert len(result.losses) == config.n_iterations
+    assert all(abs(value) < 1e3 for value in result.losses)
+
+
+def test_compile_and_checkpoint_mutually_exclusive() -> None:
+    sim = GBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=5)
+    config = TrainConfig(n_iterations=1, batch_paths=8, compile_policy=True, checkpoint_steps=True)
+    with pytest.raises(ValueError):
+        train(
+            sim,
+            FeedForwardPolicy(hidden_sizes=(4,)),
+            EuropeanCall(strike=100.0),
+            NoCost(),
+            CVaR(alpha=0.9),
+            config,
+        )

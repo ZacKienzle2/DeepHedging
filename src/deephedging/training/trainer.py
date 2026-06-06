@@ -33,6 +33,11 @@ class TrainConfig:
             addressable noise stream, so any single batch can be replayed.
         checkpoint_steps: Whether to gradient-checkpoint the episode loop.
         liquidate_terminal: Whether episodes charge terminal liquidation.
+        compile_policy: Whether to wrap the policy in ``torch.compile``.
+            Compiles only the per-step network, never the episode loop,
+            because the feature-map indirection and checkpoint branch
+            would force graph breaks. Requires a working host compiler
+            toolchain; incompatible with ``checkpoint_steps``.
     """
 
     n_iterations: int = 2000
@@ -42,6 +47,7 @@ class TrainConfig:
     seed: int | None = None
     checkpoint_steps: bool = False
     liquidate_terminal: bool = False
+    compile_policy: bool = False
 
 
 @dataclass
@@ -85,8 +91,13 @@ def train(
     Returns:
         The recorded training losses.
     """
+    if config.compile_policy and config.checkpoint_steps:
+        raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
     device = next(policy.parameters()).device
     base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
+    stepper: HedgePolicy = policy
+    if config.compile_policy:
+        stepper = torch.compile(policy)  # type: ignore[assignment]
 
     def batch_state(index: int) -> MarketState:
         noise = base_noise.child(index) if base_noise is not None else None
@@ -101,7 +112,7 @@ def train(
     with torch.no_grad():
         warmup_pnl = hedge_pnl(
             batch_state(0),
-            policy,
+            stepper,
             payoff,
             cost_model,
             premium=premium,
@@ -113,7 +124,7 @@ def train(
     for iteration in range(config.n_iterations):
         pnl = hedge_pnl(
             batch_state(iteration + 1),
-            policy,
+            stepper,
             payoff,
             cost_model,
             premium=premium,
