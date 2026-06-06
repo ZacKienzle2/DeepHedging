@@ -8,6 +8,7 @@ from deephedging.calibration import (
     HestonAnalyticPricer,
     HestonParams,
     calibrate_heston,
+    implied_vol,
     price_surface,
 )
 from deephedging.instruments import EuropeanCall, EuropeanPut
@@ -30,7 +31,9 @@ def test_synthetic_parameter_recovery() -> None:
     assert result.final_loss < result.losses[0] * 1e-4
     for tau, row in zip(taus, market, strict=True):
         refit = price_surface(result.params.as_tensors(), _S0, _STRIKES, tau)
-        assert torch.allclose(refit, row, atol=1e-2)
+        market_vols = implied_vol(row, _S0, _STRIKES, tau)
+        refit_vols = implied_vol(refit, _S0, _STRIKES, tau)
+        assert torch.allclose(refit_vols, market_vols, atol=2e-3)
     assert abs(result.params.v0 - _TRUE.v0) < 0.005
     assert abs(result.params.theta - _TRUE.theta) < 0.01
     assert abs(result.params.rho - _TRUE.rho) < 0.05
