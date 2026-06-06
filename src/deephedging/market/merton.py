@@ -105,7 +105,7 @@ class MertonSimulator:
         )
         cdf = torch.exp(log_pmf).cumsum(dim=0).to(self.dtype).to(self.device)
         counts = torch.searchsorted(cdf, uniforms.reshape(-1).contiguous()).reshape(shape)
-        counts = counts.to(self.dtype)
+        counts = torch.clamp(counts, max=_MAX_JUMPS).to(self.dtype)
 
         jump_sum = self.jump_mean * counts + self.jump_vol * torch.sqrt(counts) * z_jump
         increments = drift + diffusion * z_diffusion + jump_sum
