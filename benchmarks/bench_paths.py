@@ -45,6 +45,7 @@ def main() -> None:
     parser.add_argument("--paths", type=int, default=65_536)
     parser.add_argument("--steps", type=int, default=30)
     parser.add_argument("--repeats", type=int, default=20)
+    parser.add_argument("--amp", action="store_true")
     parser.add_argument("--json", default=None)
     args = parser.parse_args()
 
@@ -75,7 +76,7 @@ def main() -> None:
 
     def train_step() -> None:
         state = gbm.simulate(args.paths, noise=noise)
-        loss = risk(-hedge_pnl(state, policy, payoff, cost, premium=4.0))
+        loss = risk(-hedge_pnl(state, policy, payoff, cost, premium=4.0, amp=args.amp))
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()

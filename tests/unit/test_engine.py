@@ -116,6 +116,20 @@ def test_recurrent_policy_threads_state_and_matches_checkpointed_gradients() -> 
         assert torch.allclose(a, b, atol=1e-6)
 
 
+def test_amp_episode_keeps_fp32_state_and_stays_close() -> None:
+    from deephedging.policies import FeedForwardPolicy
+
+    torch.manual_seed(19)
+    policy = FeedForwardPolicy(hidden_sizes=(16,))
+    state = _state(n_paths=256, n_steps=10)
+    payoff = EuropeanCall(strike=100.0)
+    plain = hedge_pnl(state, policy, payoff, NoCost(), premium=4.0)
+    mixed = hedge_pnl(state, policy, payoff, NoCost(), premium=4.0, amp=True)
+    assert mixed.dtype == state.spot.dtype
+    assert torch.all(torch.isfinite(mixed))
+    assert float((mixed - plain).abs().mean()) < 0.05 * float(plain.abs().mean() + 1.0)
+
+
 def test_checkpointed_episode_matches_plain_gradients() -> None:
     from deephedging.policies import FeedForwardPolicy
 

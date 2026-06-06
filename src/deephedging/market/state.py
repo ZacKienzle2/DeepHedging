@@ -62,6 +62,26 @@ class MarketState:
         """Device holding the tensors."""
         return self.spot.device
 
+    def log_relative(self, t: int) -> torch.Tensor:
+        """Log of the spot relative to inception, per path.
+
+        The full log grid is computed once and cached, so a per-step
+        consumer pays one batched kernel per episode rather than one
+        elementwise log per rebalancing date.
+
+        Args:
+            t: Index of the current rebalancing date.
+
+        Returns:
+            ``log(spot[t] / spot[0])`` of shape ``(n_paths,)``.
+        """
+        cached = self._cache.get("log_relative")
+        if cached is None:
+            logs = torch.log(self.spot)
+            cached = logs - logs[0]
+            self._cache["log_relative"] = cached
+        return cached[t]
+
     def running_max(self, t: int) -> torch.Tensor:
         """Running maximum of the spot over ``[0, t]`` per path.
 

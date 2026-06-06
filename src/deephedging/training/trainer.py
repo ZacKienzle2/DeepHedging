@@ -38,6 +38,8 @@ class TrainConfig:
             because the feature-map indirection and checkpoint branch
             would force graph breaks. Requires a working host compiler
             toolchain; incompatible with ``checkpoint_steps``.
+        amp: Whether to run the policy network under bfloat16 autocast;
+            see :func:`~deephedging.training.engine.hedge_pnl`.
     """
 
     n_iterations: int = 2000
@@ -48,6 +50,7 @@ class TrainConfig:
     checkpoint_steps: bool = False
     liquidate_terminal: bool = False
     compile_policy: bool = False
+    amp: bool = False
 
 
 @dataclass
@@ -118,6 +121,7 @@ def train(
             premium=premium,
             liquidate_terminal=config.liquidate_terminal,
             feature_map=feature_map,
+            amp=config.amp,
         )
         risk_measure.warm_start(-warmup_pnl)
     loss_history: list[torch.Tensor] = []
@@ -131,6 +135,7 @@ def train(
             liquidate_terminal=config.liquidate_terminal,
             checkpoint_steps=config.checkpoint_steps,
             feature_map=feature_map,
+            amp=config.amp,
         )
         loss = risk_measure(-pnl)
         optimizer.zero_grad(set_to_none=True)

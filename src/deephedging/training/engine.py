@@ -21,6 +21,7 @@ def hedge_pnl(
     liquidate_terminal: bool = False,
     checkpoint_steps: bool = False,
     feature_map: FeatureMap | None = None,
+    amp: bool = False,
 ) -> torch.Tensor:
     """Computes the terminal PnL of a self-financed hedge along paths.
 
@@ -43,6 +44,15 @@ def hedge_pnl(
             recompute contract the CUDA backward will rely on.
         feature_map: Observation builder; defaults to
             :class:`~deephedging.features.DefaultFeatures`.
+        amp: Whether to run the policy network under bfloat16 autocast.
+            Only the network matmuls run in reduced precision; positions
+            are cast back so the PnL state, the cost accounting, and the
+            risk reduction stay in the path dtype, where systematic
+            rounding bias would otherwise survive Monte Carlo averaging.
+            Pays off only for networks wide enough to engage tensor
+            cores; at the 64-wide default the per-step cast overhead
+            exceeds the matmul saving and the benchmark runs faster
+            with this off.
 
     Returns:
         PnL per path of shape ``(n_paths,)``; positive is profit.
@@ -56,14 +66,17 @@ def hedge_pnl(
     pnl = paths.new_zeros(n_paths) + premium
     hidden: torch.Tensor | None = None
     use_checkpoint = checkpoint_steps and torch.is_grad_enabled()
+    device_type = paths.device.type
     for t in range(n_steps):
         spot = paths[t]
         features = features_of(state, t, taus[t], position)
-        if use_checkpoint:
-            output = checkpoint(policy, features, hidden, use_reentrant=False)
-            new_position, hidden = cast(tuple[torch.Tensor, torch.Tensor | None], output)
-        else:
-            new_position, hidden = policy(features, hidden)
+        with torch.autocast(device_type=device_type, dtype=torch.bfloat16, enabled=amp):
+            if use_checkpoint:
+                output = checkpoint(policy, features, hidden, use_reentrant=False)
+                new_position, hidden = cast(tuple[torch.Tensor, torch.Tensor | None], output)
+            else:
+                new_position, hidden = policy(features, hidden)
+        new_position = new_position.to(paths.dtype)
         pnl = pnl + new_position * (paths[t + 1] - spot) - cost_model(new_position - position, spot)
         position = new_position
     if liquidate_terminal:

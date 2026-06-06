@@ -65,9 +65,9 @@ class DefaultFeatures:
         Returns:
             Features of shape ``(n_paths, 3)``.
         """
-        spot = state.spot[t]
-        n_paths = spot.shape[0]
-        return torch.stack((torch.log(spot / state.spot[0]), tau.expand(n_paths), position), dim=-1)
+        log_moneyness = state.log_relative(t)
+        n_paths = log_moneyness.shape[0]
+        return torch.stack((log_moneyness, tau.expand(n_paths), position), dim=-1)
 
 
 @dataclass(frozen=True)
@@ -99,11 +99,11 @@ class RunningMaxFeatures:
         Returns:
             Features of shape ``(n_paths, 4)``.
         """
-        spot = state.spot[t]
-        n_paths = spot.shape[0]
+        log_moneyness = state.log_relative(t)
+        n_paths = log_moneyness.shape[0]
         return torch.stack(
             (
-                torch.log(spot / state.spot[0]),
+                log_moneyness,
                 tau.expand(n_paths),
                 position,
                 torch.log(state.running_max(t) / state.spot[0]),
@@ -145,11 +145,11 @@ class VarianceFeatures:
         Raises:
             KeyError: If the state carries no ``variance`` channel.
         """
-        spot = state.spot[t]
-        n_paths = spot.shape[0]
+        log_moneyness = state.log_relative(t)
+        n_paths = log_moneyness.shape[0]
         return torch.stack(
             (
-                torch.log(spot / state.spot[0]),
+                log_moneyness,
                 tau.expand(n_paths),
                 position,
                 state.aux["variance"][t],

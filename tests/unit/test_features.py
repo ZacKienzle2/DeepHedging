@@ -32,7 +32,7 @@ def test_default_features_shape_and_values() -> None:
     tau = state.spot.new_tensor(0.5)
     features = DefaultFeatures()(state, 4, tau, position)
     assert features.shape == (state.n_paths, 3)
-    assert torch.allclose(features[:, 0], torch.log(state.spot[4] / state.spot[0]))
+    assert torch.allclose(features[:, 0], torch.log(state.spot[4] / state.spot[0]), atol=1e-6)
     assert torch.all(features[:, 1] == 0.5)
     assert torch.all(features[:, 2] == 0.3)
 
