@@ -54,6 +54,7 @@ from deephedging.market import (
     NoiseSpec,
     PathSimulator,
 )
+from deephedging.market.local_vol import LocalVolSimulator
 from deephedging.policies import FeedForwardPolicy, HedgePolicy, RecurrentPolicy
 from deephedging.pricing import (
     BlackScholesPricer,
@@ -88,6 +89,7 @@ __all__ = [
     "GeometricBasketCall",
     "HedgePolicy",
     "HestonSimulator",
+    "LocalVolSimulator",
     "MarketState",
     "MertonSimulator",
     "MonteCarloPricer",
