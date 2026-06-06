@@ -17,6 +17,7 @@ from pathlib import Path
 
 import torch
 
+from deephedging.bsde.solver import BSDEConfig, BSDEResult
 from deephedging.training.trainer import TrainConfig, TrainResult
 
 
@@ -72,16 +73,16 @@ class ExperimentRecord:
     def from_run(
         cls,
         name: str,
-        config: TrainConfig,
+        config: TrainConfig | BSDEConfig,
         setup: dict[str, object],
-        result: TrainResult,
+        result: TrainResult | BSDEResult,
         duration_seconds: float,
     ) -> "ExperimentRecord":
         """Builds a record from a completed training run.
 
         Args:
             name: Human-chosen experiment identifier.
-            config: The training configuration used.
+            config: The hedging or BSDE training configuration used.
             setup: Caller-described market, payoff, cost, and risk
                 settings as plain serialisable values.
             result: The training outcome.

@@ -22,7 +22,7 @@ import time
 import torch
 
 from deephedging.bsde import BSDEConfig, BSDEProblem, DeepBSDESolver, train_bsde
-from deephedging.experiment import ExperimentRecord, append_record, capture_provenance, load_records
+from deephedging.experiment import ExperimentRecord, append_record, load_records
 
 DIMENSIONS = (1, 5, 20, 50)
 SIGMA = 0.2
@@ -113,15 +113,9 @@ def main() -> None:
             relative_error = abs(result.y0 - reference) / reference
             append_record(
                 results_path,
-                ExperimentRecord(
+                ExperimentRecord.from_run(
                     name=run_name,
-                    provenance=capture_provenance(),
-                    train_config={
-                        "n_iterations": config.n_iterations,
-                        "batch_paths": config.batch_paths,
-                        "lr": config.lr,
-                        "seed": config.seed,
-                    },
+                    config=config,
                     setup={
                         "dim": dim,
                         "sigma": SIGMA,
@@ -135,7 +129,7 @@ def main() -> None:
                         "relative_error": relative_error,
                         "final_loss": result.final_loss,
                     },
-                    losses=result.losses,
+                    result=result,
                     duration_seconds=duration,
                 ),
             )
