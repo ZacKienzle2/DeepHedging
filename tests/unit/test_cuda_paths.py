@@ -134,6 +134,34 @@ def test_graphed_episode_matches_eager_training() -> None:
     first_graphed = run(graphed=True, n_iterations=1)[0]
     assert abs(first_eager - first_graphed) < 1e-5 * max(1.0, abs(first_eager))
 
+    from deephedging import VarianceFeatures
+
+    heston = CudaHestonSimulator(
+        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=0.25, n_steps=10
+    )
+
+    def run_heston(graphed: bool) -> float:
+        torch.manual_seed(33)
+        policy = FeedForwardPolicy(n_features=4, hidden_sizes=(16,)).to("cuda")
+        config = TrainConfig(
+            n_iterations=1, batch_paths=2048, lr=1e-3, seed=6, graph_episode=graphed
+        )
+        result = train(
+            heston,
+            policy,
+            payoff,
+            cost,
+            CVaR(alpha=0.9),
+            config,
+            premium=4.0,
+            feature_map=VarianceFeatures(),
+        )
+        return result.losses[0]
+
+    heston_eager = run_heston(graphed=False)
+    heston_graphed = run_heston(graphed=True)
+    assert abs(heston_eager - heston_graphed) < 1e-5 * max(1.0, abs(heston_eager))
+
     eager_losses = run(graphed=False, n_iterations=25)
     graphed_losses = run(graphed=True, n_iterations=25)
     for eager_value, graphed_value in zip(eager_losses, graphed_losses, strict=True):

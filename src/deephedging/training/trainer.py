@@ -50,9 +50,10 @@ class TrainConfig:
             capture unit because a graphed callable keeps static saved
             activations, so capturing the per-step policy and replaying
             it many times before a single backward corrupts gradients.
-            Requires CUDA, a fixed batch size, and a simulator whose
-            state the feature map reads through ``spot`` alone; mutually
-            exclusive with checkpointing, compilation, and autocast.
+            Auxiliary channels such as the Heston variance are passed
+            alongside the spot grid in sorted key order. Requires CUDA
+            and a fixed batch size; mutually exclusive with
+            checkpointing, compilation, and autocast.
     """
 
     n_iterations: int = 2000
@@ -68,11 +69,13 @@ class TrainConfig:
 
 
 class _EpisodeLoss(torch.nn.Module):
-    """Whole-iteration module mapping a spot grid to the risk objective.
+    """Whole-iteration module mapping market tensors to the risk objective.
 
     Registers the policy and the risk measure as submodules so a CUDA
     graph capture of this module records their forward and backward
-    passes and accumulates gradients into their parameters.
+    passes and accumulates gradients into their parameters. Auxiliary
+    channels are passed positionally in a fixed key order, because graph
+    capture requires a stable tensor-only signature.
     """
 
     def __init__(
@@ -84,6 +87,7 @@ class _EpisodeLoss(torch.nn.Module):
         feature_map: FeatureMap | None,
         premium: float | torch.Tensor,
         liquidate_terminal: bool,
+        aux_keys: tuple[str, ...],
     ) -> None:
         super().__init__()
         self.policy = policy
@@ -93,18 +97,21 @@ class _EpisodeLoss(torch.nn.Module):
         self.feature_map = feature_map
         self.premium = premium
         self.liquidate_terminal = liquidate_terminal
+        self.aux_keys = aux_keys
 
-    def forward(self, spot: torch.Tensor) -> torch.Tensor:
+    def forward(self, spot: torch.Tensor, *aux: torch.Tensor) -> torch.Tensor:
         """Runs one full episode and reduces to the scalar objective.
 
         Args:
             spot: Price grid of shape ``(n_steps + 1, n_paths)``.
+            aux: Auxiliary channels in ``aux_keys`` order.
 
         Returns:
             Scalar risk objective.
         """
+        state = MarketState(spot=spot, aux=dict(zip(self.aux_keys, aux, strict=True)))
         pnl = hedge_pnl(
-            MarketState(spot=spot),
+            state,
             self.policy,
             self.payoff,
             self.cost_model,
@@ -199,7 +206,9 @@ def train(
         )
         risk_measure.warm_start(-warmup_pnl)
     graphed_loss = None
+    aux_keys: tuple[str, ...] = ()
     if config.graph_episode:
+        aux_keys = tuple(sorted(warmup_state.aux))
         episode = _EpisodeLoss(
             policy,
             payoff,
@@ -208,13 +217,19 @@ def train(
             feature_map,
             premium,
             config.liquidate_terminal,
+            aux_keys,
         )
-        graphed_loss = torch.cuda.make_graphed_callables(episode, (warmup_state.spot.clone(),))
+        sample_args = (
+            warmup_state.spot.clone(),
+            *(warmup_state.aux[key].clone() for key in aux_keys),
+        )
+        graphed_loss = torch.cuda.make_graphed_callables(episode, sample_args)
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
         state = batch_state(iteration + 1)
         if graphed_loss is not None:
-            loss = cast(torch.Tensor, graphed_loss(state.spot))
+            channels = (state.spot, *(state.aux[key] for key in aux_keys))
+            loss = cast(torch.Tensor, graphed_loss(*channels))
             optimizer.zero_grad(set_to_none=False)
         else:
             pnl = hedge_pnl(
