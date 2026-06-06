@@ -79,7 +79,9 @@ def train(
     Paths are generated on the fly per iteration. Data is unbounded,
     nothing is stored, and no overfitting to a fixed dataset is possible.
     The risk measure warm-starts its auxiliary state on an initial batch so
-    early iterations optimise the intended objective.
+    early iterations optimise the intended objective, and is moved to the
+    policy device so its parameters never force cross-device synchronisation
+    inside the loop.
 
     Args:
         simulator: Market path simulator.
@@ -101,6 +103,7 @@ def train(
     if config.compile_policy and config.checkpoint_steps:
         raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
     device = next(policy.parameters()).device
+    risk_measure.to(device)
     base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
     stepper: HedgePolicy = policy
     if config.compile_policy:
