@@ -1,4 +1,4 @@
-"""Evaluation: analytic baselines and risk metrics."""
+"""Analytic baselines and risk metrics for evaluation."""
 
 from deephedging.evaluation.black_scholes import (
     bs_call_delta,

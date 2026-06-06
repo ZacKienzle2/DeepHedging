@@ -7,7 +7,7 @@ import torch
 
 @dataclass(frozen=True)
 class UpAndOutCall:
-    """Up-and-out call: vanilla call payoff knocked out at a barrier.
+    """Up-and-out call, a vanilla call payoff knocked out at a barrier.
 
     Pays ``max(S_T - K, 0)`` if the path never reaches the barrier and zero
     otherwise. The barrier is monitored discretely on the rebalancing grid,

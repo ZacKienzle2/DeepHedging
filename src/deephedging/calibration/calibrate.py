@@ -221,6 +221,8 @@ class HestonAnalyticPricer:
 
         Raises:
             TypeError: If the payoff or simulator is outside scope.
+            ValueError: If the simulator carries a non-zero drift, which
+                the risk-neutral closed form cannot represent.
         """
         if not isinstance(simulator, HestonSimulator):
             raise TypeError(
@@ -228,6 +230,11 @@ class HestonAnalyticPricer:
             )
         if not isinstance(payoff, EuropeanCall):
             raise TypeError(f"no closed form for {type(payoff).__name__}")
+        if simulator.mu != 0.0:
+            raise ValueError(
+                "analytic pricer assumes risk-neutral zero-drift dynamics; "
+                f"simulator carries mu={simulator.mu}"
+            )
         params = HestonParams(
             v0=simulator.v0,
             kappa=simulator.kappa,

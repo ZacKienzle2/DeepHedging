@@ -22,5 +22,4 @@ jobs:
       - name: Fast tests
         run: uv run pytest -q -m "not slow"
       - name: Full tests
-        if: github.event_name == 'push'
         run: uv run pytest -q -m "slow"
