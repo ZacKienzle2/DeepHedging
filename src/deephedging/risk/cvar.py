@@ -55,9 +55,12 @@ class CVaR(RiskMeasure):
             if weights is None:
                 self.threshold.copy_(torch.quantile(loss, self.alpha))
             else:
+                total = weights.sum()
+                if not bool(total > 0.0):
+                    self.threshold.copy_(torch.quantile(loss, self.alpha))
+                    return
                 order = torch.argsort(loss)
-                cumulative = torch.cumsum(weights[order], dim=0)
-                cumulative = cumulative / cumulative[-1]
+                cumulative = torch.cumsum(weights[order], dim=0) / total
                 position = int(torch.searchsorted(cumulative, self.alpha))
                 position = min(position, loss.shape[0] - 1)
                 self.threshold.copy_(loss[order][position])

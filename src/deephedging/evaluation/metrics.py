@@ -3,7 +3,9 @@
 import torch
 
 
-def expected_shortfall(pnl: torch.Tensor, alpha: float = 0.95) -> torch.Tensor:
+def expected_shortfall(
+    pnl: torch.Tensor, alpha: float = 0.95, weights: torch.Tensor | None = None
+) -> torch.Tensor:
     """Empirical expected shortfall (CVaR) of the loss ``-pnl``.
 
     Uses the Rockafellar-Uryasev form evaluated at the empirical quantile, so
@@ -17,6 +19,9 @@ def expected_shortfall(pnl: torch.Tensor, alpha: float = 0.95) -> torch.Tensor:
     Args:
         pnl: PnL per path of shape ``(n_paths,)``; positive is profit.
         alpha: Confidence level in (0, 1).
+        weights: Optional likelihood ratios from importance sampling;
+            evaluating a tilted sample without them silently estimates
+            the wrong measure, so tilted states must pass their ratios.
 
     Returns:
         Scalar expected shortfall of the loss distribution.
@@ -27,8 +32,15 @@ def expected_shortfall(pnl: torch.Tensor, alpha: float = 0.95) -> torch.Tensor:
     if not 0.0 < alpha < 1.0:
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")
     loss = -pnl
-    var = torch.quantile(loss, alpha)
-    excess = torch.relu(loss - var)
+    if weights is None:
+        var = torch.quantile(loss, alpha)
+        excess = torch.relu(loss - var)
+        return torch.minimum(var + excess.mean() / (1.0 - alpha), loss.max())
+    order = torch.argsort(loss)
+    cumulative = torch.cumsum(weights[order], dim=0) / weights.sum()
+    position = min(int(torch.searchsorted(cumulative, alpha)), loss.shape[0] - 1)
+    var = loss[order][position]
+    excess = weights * torch.relu(loss - var)
     return torch.minimum(var + excess.mean() / (1.0 - alpha), loss.max())
 
 

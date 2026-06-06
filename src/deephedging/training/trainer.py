@@ -82,7 +82,7 @@ def _importance_weights(state: MarketState) -> torch.Tensor | None:
     log_weight = state.aux.get(LOG_WEIGHT_CHANNEL)
     if log_weight is None:
         return None
-    return torch.exp(log_weight)
+    return torch.exp(log_weight.to(torch.float64))
 
 
 class _EpisodeLoss(torch.nn.Module):
