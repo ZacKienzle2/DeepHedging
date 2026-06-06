@@ -17,6 +17,8 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "pyright>=1.1.350",
+    "matplotlib>=3.8",
+    "ipykernel>=6.29",
 ]
 
 [[tool.uv.index]]

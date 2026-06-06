@@ -118,7 +118,7 @@ def delta_hedge_positions(
     """
     n_steps = paths.shape[0] - 1
     dt = maturity / n_steps
-    times = torch.arange(n_steps, dtype=torch.float64) * dt
+    times = torch.arange(n_steps, dtype=torch.float64, device=paths.device) * dt
     tau = (maturity - times).unsqueeze(1)
     deltas = bs_call_delta(paths[:-1].to(torch.float64), strike, sigma, tau, rate)
     return deltas.to(paths.dtype)
