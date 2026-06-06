@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 import torch
 
+from deephedging.features import FeatureMap
 from deephedging.frictions.base import CostModel
 from deephedging.instruments.base import Payoff
 from deephedging.market.base import PathSimulator
@@ -59,6 +60,7 @@ def train(
     risk_measure: RiskMeasure,
     config: TrainConfig,
     premium: float | torch.Tensor = 0.0,
+    feature_map: FeatureMap | None = None,
 ) -> TrainResult:
     """Trains a hedging policy by SGD on a convex risk measure.
 
@@ -73,6 +75,7 @@ def train(
         risk_measure: Training objective applied to the loss ``-pnl``.
         config: Training hyperparameters.
         premium: Premium received for the liability at inception.
+        feature_map: Observation builder forwarded to the episode engine.
 
     Returns:
         The recorded training losses.
@@ -99,6 +102,7 @@ def train(
             premium=premium,
             liquidate_terminal=config.liquidate_terminal,
             checkpoint_steps=config.checkpoint_steps,
+            feature_map=feature_map,
         )
         loss = risk_measure(-pnl)
         optimizer.zero_grad(set_to_none=True)

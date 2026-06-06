@@ -13,6 +13,7 @@ from deephedging.bsde import (
     ZeroGenerator,
     train_bsde,
 )
+from deephedging.features import DefaultFeatures, FeatureMap, RunningMaxFeatures
 from deephedging.evaluation import (
     bs_call_delta,
     bs_call_price,
@@ -38,8 +39,10 @@ __all__ = [
     "CVaR",
     "CostModel",
     "DeepBSDESolver",
+    "DefaultFeatures",
     "DiscountGenerator",
     "Entropic",
+    "FeatureMap",
     "EuropeanCall",
     "EuropeanPut",
     "FeedForwardPolicy",
@@ -52,6 +55,7 @@ __all__ = [
     "ProportionalCost",
     "RecurrentPolicy",
     "RiskMeasure",
+    "RunningMaxFeatures",
     "TrainConfig",
     "UpAndOutCall",
     "ZeroGenerator",

@@ -5,6 +5,7 @@ from typing import cast
 import torch
 from torch.utils.checkpoint import checkpoint
 
+from deephedging.features import DefaultFeatures, FeatureMap
 from deephedging.frictions.base import CostModel
 from deephedging.instruments.base import Payoff
 from deephedging.policies.base import HedgePolicy
@@ -18,14 +19,15 @@ def hedge_pnl(
     premium: float | torch.Tensor = 0.0,
     liquidate_terminal: bool = False,
     checkpoint_steps: bool = False,
+    feature_map: FeatureMap | None = None,
 ) -> torch.Tensor:
     """Computes the terminal PnL of a self-financed hedge along paths.
 
     Runs the sequential time-major episode loop: at each rebalancing date the
-    policy maps ``(log moneyness, time to maturity, previous position)`` to a
-    position, trading gains accumulate as ``pos_t * (S_{t+1} - S_t)``, and
-    transaction costs are charged on every position change including the
-    initial trade from a flat book.
+    policy maps the feature-map output (by default log moneyness, time to
+    maturity, and previous position) to a position, trading gains accumulate
+    as ``pos_t * (S_{t+1} - S_t)``, and transaction costs are charged on
+    every position change including the initial trade from a flat book.
 
     Args:
         paths: Price paths of shape ``(n_steps + 1, n_paths)``.
@@ -38,13 +40,15 @@ def hedge_pnl(
         checkpoint_steps: Whether to gradient-checkpoint each policy call,
             trading recompute for ``O(1/T)`` activation memory. Validates the
             recompute contract the CUDA backward will rely on.
+        feature_map: Observation builder; defaults to
+            :class:`~deephedging.features.DefaultFeatures`.
 
     Returns:
         PnL per path of shape ``(n_paths,)``; positive is profit.
     """
     n_steps = paths.shape[0] - 1
     n_paths = paths.shape[1]
-    spot0 = paths[0]
+    features_of = feature_map if feature_map is not None else DefaultFeatures()
     taus = torch.arange(n_steps, 0, -1, dtype=paths.dtype, device=paths.device) / n_steps
     position = paths.new_zeros(n_paths)
     pnl = paths.new_zeros(n_paths) + premium
@@ -52,8 +56,7 @@ def hedge_pnl(
     use_checkpoint = checkpoint_steps and torch.is_grad_enabled()
     for t in range(n_steps):
         spot = paths[t]
-        tau = taus[t].expand(n_paths)
-        features = torch.stack((torch.log(spot / spot0), tau, position), dim=-1)
+        features = features_of(paths, t, taus[t], position)
         if use_checkpoint:
             output = checkpoint(policy, features, state, use_reentrant=False)
             new_position, state = cast(tuple[torch.Tensor, torch.Tensor | None], output)
