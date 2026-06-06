@@ -53,6 +53,7 @@ from deephedging.market import (
     MertonSimulator,
     NoiseSpec,
     PathSimulator,
+    TiltedGBMSimulator,
 )
 from deephedging.market.local_vol import LocalVolSimulator
 from deephedging.policies import FeedForwardPolicy, HedgePolicy, RecurrentPolicy
@@ -106,6 +107,7 @@ __all__ = [
     "RunningMaxAccumulator",
     "RiskMeasure",
     "RunningMaxFeatures",
+    "TiltedGBMSimulator",
     "TrainConfig",
     "UpAndOutCall",
     "VarianceFeatures",

@@ -12,6 +12,7 @@ from deephedging.instruments.base import Payoff
 from deephedging.market.base import PathSimulator
 from deephedging.market.noise import NoiseSpec
 from deephedging.market.state import MarketState
+from deephedging.market.tilted import LOG_WEIGHT_CHANNEL
 from deephedging.policies.base import HedgePolicy
 from deephedging.risk.base import RiskMeasure
 from deephedging.training.engine import hedge_pnl
@@ -75,6 +76,13 @@ class TrainConfig:
     graph_episode: bool = False
 
 
+def _importance_weights(state: MarketState) -> torch.Tensor | None:
+    log_weight = state.aux.get(LOG_WEIGHT_CHANNEL)
+    if log_weight is None:
+        return None
+    return torch.exp(log_weight)
+
+
 class _EpisodeLoss(torch.nn.Module):
     """Whole-iteration module mapping market tensors to the risk objective.
 
@@ -126,7 +134,7 @@ class _EpisodeLoss(torch.nn.Module):
             liquidate_terminal=self.liquidate_terminal,
             feature_map=self.feature_map,
         )
-        return self.risk_measure(-pnl)
+        return self.risk_measure(-pnl, weights=_importance_weights(state))
 
 
 @dataclass
@@ -211,7 +219,7 @@ def train(
             feature_map=feature_map,
             amp=config.amp,
         )
-        risk_measure.warm_start(-warmup_pnl)
+        risk_measure.warm_start(-warmup_pnl, weights=_importance_weights(warmup_state))
     graphed_loss = None
     aux_keys: tuple[str, ...] = ()
     if config.graph_episode:
@@ -259,7 +267,7 @@ def train(
                 feature_map=feature_map,
                 amp=config.amp,
             )
-            loss = risk_measure(-pnl)
+            loss = risk_measure(-pnl, weights=_importance_weights(state))
             optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()

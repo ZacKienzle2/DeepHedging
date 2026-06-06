@@ -36,11 +36,14 @@ class Entropic(RiskMeasure):
             raise ValueError(f"risk_aversion must be positive, got {risk_aversion}")
         self.risk_aversion = risk_aversion
 
-    def forward(self, loss: torch.Tensor) -> torch.Tensor:
+    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
         """Evaluates the entropic risk of a loss sample.
 
         Args:
             loss: Loss per path of shape ``(n_paths,)``.
+            weights: Optional likelihood ratios of shape ``(n_paths,)``;
+                the exponential moment becomes their weighted mean inside
+                the stable log-sum-exp.
 
         Returns:
             Scalar entropic risk.
@@ -52,4 +55,7 @@ class Entropic(RiskMeasure):
             raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
         a = self.risk_aversion
         n = loss.shape[0]
-        return (torch.logsumexp(a * loss, dim=0) - math.log(n)) / a
+        exponent = a * loss
+        if weights is not None:
+            exponent = exponent + torch.log(torch.clamp(weights, min=1e-300))
+        return (torch.logsumexp(exponent, dim=0) - math.log(n)) / a

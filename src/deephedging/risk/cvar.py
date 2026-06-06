@@ -38,25 +38,38 @@ class CVaR(RiskMeasure):
         self.alpha = alpha
         self.threshold = nn.Parameter(torch.zeros(()))
 
-    def warm_start(self, loss: torch.Tensor) -> None:
+    def warm_start(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> None:
         """Initialises the threshold at the empirical alpha-quantile.
 
         Without this, a threshold starting at zero lags the true VaR for
         hundreds of iterations and the indicator fires on far more than the
         target tail fraction, so early training optimises something between
-        the mean loss and the intended CVaR.
+        the mean loss and the intended CVaR. Under importance sampling the
+        quantile is taken in the weighted distribution.
 
         Args:
             loss: Loss per path of shape ``(n_paths,)``.
+            weights: Optional likelihood ratios matching ``loss``.
         """
         with torch.no_grad():
-            self.threshold.copy_(torch.quantile(loss, self.alpha))
+            if weights is None:
+                self.threshold.copy_(torch.quantile(loss, self.alpha))
+            else:
+                order = torch.argsort(loss)
+                cumulative = torch.cumsum(weights[order], dim=0)
+                cumulative = cumulative / cumulative[-1]
+                position = int(torch.searchsorted(cumulative, self.alpha))
+                position = min(position, loss.shape[0] - 1)
+                self.threshold.copy_(loss[order][position])
 
-    def forward(self, loss: torch.Tensor) -> torch.Tensor:
+    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
         """Evaluates the Rockafellar-Uryasev objective.
 
         Args:
             loss: Loss per path of shape ``(n_paths,)``.
+            weights: Optional likelihood ratios of shape ``(n_paths,)``;
+                the tail expectation becomes their weighted mean, which
+                keeps the objective unbiased under a tilted sampler.
 
         Returns:
             Scalar objective; an upper bound on ``CVaR_alpha`` that is tight
@@ -68,4 +81,6 @@ class CVaR(RiskMeasure):
         if loss.dim() != 1:
             raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
         excess = torch.relu(loss - self.threshold)
+        if weights is not None:
+            excess = excess * weights
         return self.threshold + excess.mean() / (1.0 - self.alpha)
