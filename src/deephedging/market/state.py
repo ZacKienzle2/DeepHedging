@@ -98,6 +98,40 @@ class MarketState:
             self._cache["log_relative"] = cached
         return cached[t]
 
+    def realised_variance(self, t: int, window: int) -> torch.Tensor:
+        """Mean squared log return over the trailing window, per path.
+
+        The squared-return cumulative sum is computed once and cached, so
+        a per-step consumer pays one batched kernel per episode. The
+        value is per step, not annualised; consumers divide by the step
+        size. At inception no return exists and the estimate is zero,
+        and shorter prefixes average over what is available, keeping the
+        statistic adapted.
+
+        Args:
+            t: Index of the current rebalancing date.
+            window: Number of trailing returns to average over.
+
+        Returns:
+            Per-step realised variance of shape ``(n_paths,)``.
+
+        Raises:
+            ValueError: If ``window`` is not positive.
+        """
+        if window < 1:
+            raise ValueError(f"window must be positive, got {window}")
+        cached = self._cache.get("squared_return_cumsum")
+        if cached is None:
+            log_grid = torch.log(self.spot)
+            squared = (log_grid[1:] - log_grid[:-1]) ** 2
+            cached = squared.new_zeros((self.n_steps + 1, *squared.shape[1:]))
+            cached[1:] = torch.cumsum(squared, dim=0)
+            self._cache["squared_return_cumsum"] = cached
+        if t == 0:
+            return cached[0]
+        start = max(t - window, 0)
+        return (cached[t] - cached[start]) / (t - start)
+
     def running_max(self, t: int) -> torch.Tensor:
         """Running maximum of the spot over ``[0, t]`` per path.
 

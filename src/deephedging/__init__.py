@@ -33,6 +33,7 @@ from deephedging.features import (
     DefaultFeatures,
     FeatureMap,
     MultiAssetFeatures,
+    RealizedVolFeatures,
     RunningMaxFeatures,
     VarianceFeatures,
 )
@@ -102,6 +103,7 @@ __all__ = [
     "PathSimulator",
     "PriceEstimate",
     "Pricer",
+    "RealizedVolFeatures",
     "ProportionalCost",
     "RecurrentPolicy",
     "RunningMaxAccumulator",

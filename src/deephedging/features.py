@@ -162,6 +162,51 @@ class MultiAssetFeatures:
 
 
 @dataclass(frozen=True)
+class RealizedVolFeatures:
+    """Baseline features plus an annualised realised-variance estimate.
+
+    The hand-engineered competitor to a recurrent policy under partial
+    observability. A rolling mean of squared log returns estimates the
+    instantaneous variance with relative error near ``sqrt(2 / window)``,
+    so the window trades estimator noise against staleness; a learned
+    recurrence can in principle weight history better, and the gap
+    between the two is exactly what the incomplete-information ablation
+    measures.
+
+    Attributes:
+        window: Number of trailing returns averaged.
+        step_size: Episode step in years, annualising the estimate.
+    """
+
+    window: int
+    step_size: float
+
+    @property
+    def n_features(self) -> int:
+        """Width of the produced feature vector."""
+        return 4
+
+    def __call__(
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
+    ) -> torch.Tensor:
+        """Computes baseline features plus annualised realised variance.
+
+        Args:
+            state: Simulated market state.
+            t: Index of the current rebalancing date.
+            tau: Scalar tensor, normalised time to maturity at ``t``.
+            position: Position held entering ``t``, shape ``(n_paths,)``.
+
+        Returns:
+            Features of shape ``(n_paths, 4)``.
+        """
+        log_moneyness = state.log_relative(t)
+        n_paths = log_moneyness.shape[0]
+        realised = state.realised_variance(t, self.window) / self.step_size
+        return torch.stack((log_moneyness, tau.expand(n_paths), position, realised), dim=-1)
+
+
+@dataclass(frozen=True)
 class VarianceFeatures:
     """Baseline features plus the instantaneous variance channel.
 
