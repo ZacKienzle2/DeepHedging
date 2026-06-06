@@ -59,9 +59,11 @@ class TrainConfig:
             device memory degrades silently into host paging at a
             throughput collapse of more than an order of magnitude, so
             the trainer warns when the post-capture reservation
-            approaches the device capacity. Requires CUDA and a fixed
-            batch size; mutually exclusive with checkpointing,
-            compilation, and autocast.
+            approaches the device capacity. Combining capture with
+            gradient checkpointing trades replayed recompute for that
+            footprint and lifts the batch ceiling. Requires CUDA and a
+            fixed batch size; mutually exclusive with compilation and
+            autocast.
     """
 
     n_iterations: int = 2000
@@ -103,6 +105,7 @@ class _EpisodeLoss(torch.nn.Module):
         premium: float | torch.Tensor,
         liquidate_terminal: bool,
         aux_keys: tuple[str, ...],
+        checkpoint_steps: bool,
     ) -> None:
         super().__init__()
         self.policy = policy
@@ -113,6 +116,7 @@ class _EpisodeLoss(torch.nn.Module):
         self.premium = premium
         self.liquidate_terminal = liquidate_terminal
         self.aux_keys = aux_keys
+        self.checkpoint_steps = checkpoint_steps
 
     def forward(self, spot: torch.Tensor, *aux: torch.Tensor) -> torch.Tensor:
         """Runs one full episode and reduces to the scalar objective.
@@ -132,6 +136,7 @@ class _EpisodeLoss(torch.nn.Module):
             self.cost_model,
             premium=self.premium,
             liquidate_terminal=self.liquidate_terminal,
+            checkpoint_steps=self.checkpoint_steps,
             feature_map=self.feature_map,
         )
         return self.risk_measure(-pnl, weights=_importance_weights(state))
@@ -186,8 +191,8 @@ def train(
     """
     if config.compile_policy and config.checkpoint_steps:
         raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
-    if config.graph_episode and (config.compile_policy or config.checkpoint_steps or config.amp):
-        raise ValueError("graph_episode excludes compilation, checkpointing, and autocast")
+    if config.graph_episode and (config.compile_policy or config.amp):
+        raise ValueError("graph_episode excludes compilation and autocast")
     device = next(policy.parameters()).device
     if config.graph_episode and device.type != "cuda":
         raise ValueError("graph_episode requires the policy on a CUDA device")
@@ -233,6 +238,7 @@ def train(
             premium,
             config.liquidate_terminal,
             aux_keys,
+            config.checkpoint_steps,
         )
         sample_args = (
             warmup_state.spot.clone(),

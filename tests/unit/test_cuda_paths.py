@@ -168,6 +168,22 @@ def test_graphed_episode_matches_eager_training() -> None:
     first_graphed = run(graphed=True, n_iterations=1)[0]
     assert abs(first_eager - first_graphed) < 1e-5 * max(1.0, abs(first_eager))
 
+    def run_checkpointed() -> float:
+        torch.manual_seed(31)
+        policy = FeedForwardPolicy(hidden_sizes=(16,)).to("cuda")
+        config = TrainConfig(
+            n_iterations=1,
+            batch_paths=2048,
+            lr=1e-3,
+            seed=5,
+            graph_episode=True,
+            checkpoint_steps=True,
+        )
+        return train(sim, policy, payoff, cost, CVaR(alpha=0.9), config, premium=4.0).losses[0]
+
+    first_checkpointed = run_checkpointed()
+    assert abs(first_graphed - first_checkpointed) < 1e-5 * max(1.0, abs(first_graphed))
+
     from deephedging import VarianceFeatures
 
     heston = CudaHestonSimulator(
