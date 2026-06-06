@@ -146,6 +146,9 @@ def train_bsde(
 
     Returns:
         The solved ``y0``, the final loss certificate, and the loss history.
+
+    Raises:
+        ValueError: If the solver and problem dimensions disagree.
     """
     if solver.dim != problem.dim:
         raise ValueError(f"solver dim {solver.dim} != problem dim {problem.dim}")

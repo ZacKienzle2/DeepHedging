@@ -93,6 +93,10 @@ def train(
 
     Returns:
         The recorded training losses.
+
+    Raises:
+        ValueError: If the config enables both policy compilation and
+            gradient checkpointing.
     """
     if config.compile_policy and config.checkpoint_steps:
         raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")

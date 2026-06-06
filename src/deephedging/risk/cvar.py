@@ -61,6 +61,9 @@ class CVaR(RiskMeasure):
         Returns:
             Scalar objective; an upper bound on ``CVaR_alpha`` that is tight
             when the threshold equals the alpha-quantile of the loss.
+
+        Raises:
+            ValueError: If ``loss`` is not one-dimensional.
         """
         if loss.dim() != 1:
             raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")

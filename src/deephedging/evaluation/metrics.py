@@ -20,6 +20,9 @@ def expected_shortfall(pnl: torch.Tensor, alpha: float = 0.95) -> torch.Tensor:
 
     Returns:
         Scalar expected shortfall of the loss distribution.
+
+    Raises:
+        ValueError: If ``alpha`` is outside (0, 1).
     """
     if not 0.0 < alpha < 1.0:
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")

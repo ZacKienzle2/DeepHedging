@@ -44,6 +44,9 @@ class Entropic(RiskMeasure):
 
         Returns:
             Scalar entropic risk.
+
+        Raises:
+            ValueError: If ``loss`` is not one-dimensional.
         """
         if loss.dim() != 1:
             raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
