@@ -14,6 +14,7 @@ stored alongside so the band figure regenerates from the store alone.
 """
 
 import argparse
+import gc
 import time
 
 import torch
@@ -236,8 +237,10 @@ def main() -> None:
                     f"es95 {summary['es_95']:7.4f}  mean {summary['mean']:7.4f}  "
                     f"{duration:6.1f}s"
                 )
-                del policy
+                del policy, result
+                gc.collect()
                 if arguments.device == "cuda":
+                    torch.cuda.synchronize()
                     torch.cuda.empty_cache()
 
 

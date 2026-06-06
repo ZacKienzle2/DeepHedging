@@ -17,6 +17,7 @@ effective sample workable at the highest aversion in the grid.
 """
 
 import argparse
+import gc
 import time
 
 import torch
@@ -145,8 +146,10 @@ def main() -> None:
                 f"std {summary['std']:6.4f}  es95 {summary['es_95']:7.4f}  "
                 f"es99 {summary['es_99']:7.4f}  {duration:6.1f}s"
             )
-            del policy
+            del policy, result
+            gc.collect()
             if arguments.device == "cuda":
+                torch.cuda.synchronize()
                 torch.cuda.empty_cache()
 
 
