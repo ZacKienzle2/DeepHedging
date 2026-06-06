@@ -1,6 +1,7 @@
 """Training loop for hedging policies."""
 
 from dataclasses import dataclass, field
+from typing import cast
 
 import torch
 
@@ -213,7 +214,7 @@ def train(
     for iteration in range(config.n_iterations):
         state = batch_state(iteration + 1)
         if graphed_loss is not None:
-            loss = graphed_loss(state.spot)
+            loss = cast(torch.Tensor, graphed_loss(state.spot))
             optimizer.zero_grad(set_to_none=False)
         else:
             pnl = hedge_pnl(
