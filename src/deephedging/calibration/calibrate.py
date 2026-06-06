@@ -33,7 +33,7 @@ def _softplus(value: torch.Tensor) -> torch.Tensor:
 
 
 def _softplus_inverse(value: float) -> float:
-    return math.log(math.expm1(value))
+    return math.log(math.expm1(max(value, 1e-8)))
 
 
 def _constrain(raw: torch.Tensor) -> tuple[torch.Tensor, ...]:
@@ -142,25 +142,37 @@ def calibrate_heston(
         initial: Starting parameters.
         config: Optimiser hyperparameters; defaults applied when omitted.
 
+    Quotes whose prices violate the no-arbitrage band invert to NaN and
+    receive zero weight, so a handful of bad market points cannot poison
+    the objective.
+
     Returns:
         The recovered parameters with the loss trajectory.
 
     Raises:
-        ValueError: If the price rows disagree with the maturity count.
+        ValueError: If the price rows disagree with the maturity count,
+            if any maturity is non-positive, or if a maturity has no
+            invertible quote at all.
     """
     if market_prices.shape[0] != len(taus):
         raise ValueError(
             f"market_prices has {market_prices.shape[0]} rows for {len(taus)} maturities"
         )
+    if not taus or any(tau <= 0.0 for tau in taus):
+        raise ValueError(f"taus must be non-empty and positive, got {taus}")
     settings = config if config is not None else CalibrationConfig()
     weights = []
     for row, tau in zip(market_prices, taus, strict=True):
         market_vols = implied_vol(row, s0, strikes, tau)
+        usable = torch.isfinite(market_vols)
+        if not bool(usable.any()):
+            raise ValueError(f"no quote at maturity {tau} inverts to a finite volatility")
+        safe_vols = torch.where(usable, market_vols, torch.ones_like(market_vols))
         sqrt_tau = math.sqrt(tau)
-        d1 = (torch.log(s0 / strikes) + 0.5 * market_vols**2 * tau) / (market_vols * sqrt_tau)
+        d1 = (torch.log(s0 / strikes) + 0.5 * safe_vols**2 * tau) / (safe_vols * sqrt_tau)
         vega = s0 * torch.exp(-0.5 * d1**2) / math.sqrt(2.0 * math.pi) * sqrt_tau
-        floored = torch.clamp(vega, min=0.05 * float(vega.max()))
-        weights.append((1.0 / floored**2).detach())
+        floored = torch.clamp(vega, min=0.05 * float(vega[usable].max()))
+        weights.append((usable.to(vega.dtype) / floored**2).detach())
 
     raw = _unconstrain(initial).requires_grad_(True)
     optimizer = torch.optim.Adam([raw], lr=settings.lr)

@@ -59,7 +59,19 @@ def cos_call_price(
 
     Returns:
         Call prices of shape ``(n_strikes,)`` in float64.
+
+    Raises:
+        ValueError: If the expansion size, spot, strikes, or truncation
+            interval is degenerate.
     """
+    if n_terms < 2:
+        raise ValueError(f"n_terms must be at least 2, got {n_terms}")
+    if s0 <= 0.0:
+        raise ValueError(f"s0 must be positive, got {s0}")
+    if bool((strikes <= 0.0).any()):
+        raise ValueError("strikes must be positive everywhere")
+    if not b > a:
+        raise ValueError(f"truncation interval must satisfy b > a, got [{a}, {b}]")
     k = torch.arange(n_terms, dtype=torch.float64)
     omega = k * math.pi / (b - a)
     payoff_coefficients = (2.0 / (b - a)) * (_chi(omega, a, b) - _psi(omega, a, b))
