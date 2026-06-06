@@ -60,10 +60,10 @@ def test_cvar_rejects_invalid_alpha() -> None:
 
 def test_entropic_matches_analytic_normal_value() -> None:
     risk_aversion = 0.5
-    loss = _normal_sample()
+    loss = _normal_sample(n=1_200_000)
     measure = Entropic(risk_aversion=risk_aversion)
     analytic = 0.5 * risk_aversion
-    assert abs(float(measure(loss)) - analytic) < 5e-3
+    assert abs(float(measure(loss)) - analytic) < 3e-3
 
 
 def test_entropic_increases_with_risk_aversion() -> None:

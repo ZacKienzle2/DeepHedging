@@ -47,14 +47,19 @@ def test_single_asset_matches_gbm_bitwise() -> None:
 
 
 def test_empirical_correlation_recovers_target() -> None:
-    state = _simulator(n_steps=1).simulate(400_000, noise=NoiseSpec(seed=47))
-    log_returns = torch.log(state.spot[-1] / 100.0)
+    sim = _simulator(n_steps=1)
+    log_returns = torch.cat(
+        [
+            torch.log(sim.simulate(400_000, noise=NoiseSpec(seed=47).child(index)).spot[-1] / 100.0)
+            for index in range(3)
+        ]
+    )
     centred = log_returns - log_returns.mean(dim=0, keepdim=True)
     covariance = centred.T @ centred / centred.shape[0]
     scale = covariance.diagonal().sqrt()
     correlation = covariance / (scale.unsqueeze(0) * scale.unsqueeze(1))
     target = torch.tensor(_CORRELATION)
-    assert torch.allclose(correlation, target, atol=5e-3)
+    assert torch.allclose(correlation, target, atol=3e-3)
 
 
 def test_geometric_basket_matches_closed_form() -> None:

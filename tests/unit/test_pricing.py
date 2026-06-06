@@ -59,6 +59,21 @@ def test_monte_carlo_prices_any_payoff_under_any_model() -> None:
     assert 0.0 < knocked.value < plain.value
 
 
+def test_nonzero_rate_backends_agree() -> None:
+    rate = 0.05
+    drifted = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=50, mu=rate)
+    payoff = EuropeanCall(strike=100.0)
+    closed = BlackScholesPricer(rate=rate).price(payoff, drifted)
+    sampled = MonteCarloPricer(n_paths=400_000, seed=151, rate=rate).price(payoff, drifted)
+    assert abs(closed.value - sampled.value) < 3.0 * sampled.standard_error
+
+
+def test_closed_form_rejects_drift_mismatch() -> None:
+    drifted = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=10, mu=0.05)
+    with pytest.raises(ValueError):
+        BlackScholesPricer(rate=0.0).price(EuropeanCall(strike=100.0), drifted)
+
+
 def test_monte_carlo_reproducible_by_seed() -> None:
     pricer = MonteCarloPricer(n_paths=10_000, seed=11)
     first = pricer.price(EuropeanCall(strike=100.0), _gbm())

@@ -74,9 +74,15 @@ class BlackScholesPricer:
         Raises:
             TypeError: If the payoff or simulator is outside the closed
                 form's scope.
+            ValueError: If the simulator drift disagrees with the pricing
+                rate, which would price under the wrong measure.
         """
         if not isinstance(simulator, GBMSimulator):
             raise TypeError(f"closed form requires GBMSimulator, got {type(simulator).__name__}")
+        if simulator.mu != self.rate:
+            raise ValueError(
+                f"risk-neutral pricing needs simulator drift {self.rate}, got {simulator.mu}"
+            )
         if isinstance(payoff, EuropeanCall):
             value = bs_call_price(
                 simulator.s0, payoff.strike, simulator.sigma, simulator.maturity, self.rate
@@ -92,33 +98,38 @@ class BlackScholesPricer:
 
 @dataclass(frozen=True)
 class MonteCarloPricer:
-    """Model-agnostic pricer by plain Monte Carlo expectation.
+    """Model-agnostic pricer by discounted Monte Carlo expectation.
 
     Prices any payoff under any simulator at the cost of sampling noise,
-    reported honestly through the standard error. Uses the simulator's
-    own measure; for arbitrage-free prices the simulator drift must be
-    risk-neutral.
+    reported honestly through the standard error. The discount applies
+    the pricer's rate over the simulator's maturity, so the estimate
+    stays comparable with discounting closed forms away from the
+    zero-rate path where the two would otherwise silently disagree.
 
     Attributes:
         n_paths: Number of simulated paths.
         seed: Noise seed for a reproducible estimate.
+        rate: Continuously compounded discount rate; must equal the
+            simulator drift for a risk-neutral price.
     """
 
     n_paths: int = 200_000
     seed: int = 0
+    rate: float = 0.0
 
     def price(self, payoff: Payoff, simulator: PathSimulator) -> PriceEstimate:
-        """Estimates the undiscounted expectation of the payoff.
+        """Estimates the discounted expectation of the payoff.
 
         Args:
             payoff: The liability to price.
             simulator: Market dynamics under the pricing measure.
 
         Returns:
-            The sample mean with its standard error.
+            The discounted sample mean with its standard error.
         """
         state = simulator.simulate(self.n_paths, noise=NoiseSpec(seed=self.seed))
         values = payoff(state.spot)
-        mean = float(values.mean())
-        spread = float(values.std()) / math.sqrt(self.n_paths)
+        discount = math.exp(-self.rate * simulator.maturity)
+        mean = float(values.mean()) * discount
+        spread = float(values.std()) / math.sqrt(self.n_paths) * discount
         return PriceEstimate(value=mean, standard_error=spread, provenance="monte-carlo")
