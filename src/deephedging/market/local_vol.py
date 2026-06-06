@@ -69,11 +69,16 @@ class LocalVolSimulator:
             device=self.device,
             generator=generator,
         )
+        rows = (
+            torch.stack([self.surface.vol_row(k * dt) for k in range(self.n_steps)])
+            .to(self.dtype)
+            .to(self.device)
+        )
         log_return = torch.zeros((n_paths,), dtype=self.dtype, device=self.device)
         out = torch.empty((self.n_steps + 1, n_paths), dtype=self.dtype, device=self.device)
         out[0] = 0.0
         for k in range(self.n_steps):
-            row = self.surface.vol_row(k * dt).to(self.dtype).to(self.device)
+            row = rows[k]
             spot = self.s0 * torch.exp(log_return)
             clamped = torch.clamp(spot, min=strike_low, max=strike_high)
             index = torch.clamp(

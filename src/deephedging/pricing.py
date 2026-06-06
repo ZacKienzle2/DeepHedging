@@ -148,7 +148,8 @@ class MonteCarloPricer:
         """
         values: torch.Tensor | None = None
         fold_source = getattr(simulator, "simulate_folds", None)
-        if fold_source is not None:
+        fold_expressible = isinstance(payoff, (EuropeanCall, EuropeanPut, UpAndOutCall))
+        if fold_source is not None and fold_expressible:
             folds = fold_source(self.n_paths, noise=NoiseSpec(seed=self.seed))
             values = _payoff_from_folds(payoff, folds)
         if values is None:

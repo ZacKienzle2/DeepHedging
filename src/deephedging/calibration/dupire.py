@@ -86,6 +86,8 @@ def dupire_surface(
     """
     if taus.shape[0] < 3:
         raise ValueError(f"need at least three maturities, got {taus.shape[0]}")
+    if bool((taus.diff() <= 0.0).any()):
+        raise ValueError("taus must be strictly increasing")
     if strikes.shape[0] < 5:
         raise ValueError(f"need at least five strikes, got {strikes.shape[0]}")
     spacing = strikes.diff()
