@@ -31,6 +31,11 @@ def _splitmix64(value: int) -> int:
 class NoiseSpec:
     """Names one independent noise stream.
 
+    Streams are injective in ``stream`` at fixed seed, so collisions
+    within one experiment are impossible. Across experiments choose seeds
+    independently; seeds derived arithmetically from other seed and
+    stream values can be engineered to collide on the mixing diagonal.
+
     Attributes:
         seed: Experiment-level seed.
         stream: Stream index within the experiment, for example the
@@ -42,6 +47,12 @@ class NoiseSpec:
 
     def child(self, index: int) -> "NoiseSpec":
         """Derives the stream for one unit of work.
+
+        Composition is additive, so ``child(a).child(b)`` collides with
+        ``child(a + b)``. Call it exactly once per unit of work from a
+        single base spec; never nest. Distributed ranks must partition by
+        interleaving, ``base.child(i * world_size + rank)``, which is
+        collision-free for any iteration count.
 
         Args:
             index: Iteration or rank index.
