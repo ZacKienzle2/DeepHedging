@@ -1,0 +1,29 @@
+name: Nightly GPU
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  gpu-tests:
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: GPU test suite
+        run: uv run pytest -q -m gpu
+      - name: Benchmark
+        run: uv run python benchmarks/bench_paths.py --device cuda --json current.json
+      - name: Regression gate
+        run: |
+          if [ -f benchmarks/baseline_cuda.json ]; then
+            uv run python benchmarks/compare_baseline.py benchmarks/baseline_cuda.json current.json
+          else
+            echo "no committed baseline yet; record one from a clean device"
+          fi

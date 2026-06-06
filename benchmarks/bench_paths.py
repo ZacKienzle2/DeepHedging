@@ -127,6 +127,37 @@ def main() -> None:
                 )
                 / 1e6
             )
+
+            from deephedging import UpAndOutCall
+            from deephedging.pricing import MonteCarloPricer
+
+            barrier_steps = 250
+            pricing_sim = CudaHestonSimulator(
+                s0=100.0,
+                v0=0.04,
+                kappa=1.5,
+                theta=0.04,
+                xi=0.5,
+                rho=-0.7,
+                maturity=1.0,
+                n_steps=barrier_steps,
+            )
+            barrier = UpAndOutCall(strike=100.0, barrier=130.0)
+            pricer = MonteCarloPricer(n_paths=args.paths, seed=1)
+
+            def fold_price() -> None:
+                pricer.price(barrier, pricing_sim)
+
+            def grid_price() -> None:
+                state = pricing_sim.simulate(args.paths, noise=noise)
+                barrier(state.spot).mean()
+
+            results["fold_price_mpaths_per_s"] = (
+                args.paths / _timed(fold_price, args.repeats, "cuda") / 1e6
+            )
+            results["grid_price_mpaths_per_s"] = (
+                args.paths / _timed(grid_price, args.repeats, "cuda") / 1e6
+            )
     for key, value in results.items():
         print(f"{key}: {value if isinstance(value, str | int) else f'{value:.3f}'}")
     if args.json:
