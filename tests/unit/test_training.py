@@ -4,6 +4,7 @@ Assertions are statistical relationships, not bitwise goldens: a trained
 policy must beat not hedging, and the recorded objective must improve.
 """
 
+import pytest
 import torch
 
 from deephedging.evaluation import bs_call_price, expected_shortfall
@@ -15,6 +16,7 @@ from deephedging.risk import CVaR
 from deephedging.training import TrainConfig, hedge_pnl, train
 
 
+@pytest.mark.slow
 def test_trained_policy_beats_no_hedge() -> None:
     torch.manual_seed(21)
     sigma, maturity, strike = 0.2, 0.25, 100.0
@@ -41,6 +43,7 @@ def test_trained_policy_beats_no_hedge() -> None:
     assert late < early
 
 
+@pytest.mark.slow
 def test_training_is_reproducible_with_seed() -> None:
     sigma, maturity, strike = 0.2, 0.25, 100.0
     sim = GBMSimulator(s0=100.0, sigma=sigma, maturity=maturity, n_steps=5)

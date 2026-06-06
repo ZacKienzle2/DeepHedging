@@ -31,6 +31,7 @@ def _config() -> BSDEConfig:
     return BSDEConfig(n_iterations=800, batch_paths=512, lr=3e-3, seed=7)
 
 
+@pytest.mark.slow
 def test_one_dim_call_zero_rate_matches_black_scholes() -> None:
     torch.manual_seed(1)
     problem = BSDEProblem(
@@ -48,6 +49,7 @@ def test_one_dim_call_zero_rate_matches_black_scholes() -> None:
     assert result.final_loss < sum(result.losses[:5]) / 5
 
 
+@pytest.mark.slow
 def test_one_dim_call_with_rate_matches_black_scholes() -> None:
     torch.manual_seed(2)
     rate = 0.05
@@ -67,6 +69,7 @@ def test_one_dim_call_with_rate_matches_black_scholes() -> None:
     assert abs(result.y0 - reference) < 0.03 * reference
 
 
+@pytest.mark.slow
 def test_initial_z_approximates_delta_times_diffusion() -> None:
     torch.manual_seed(3)
     sigma = 0.2
@@ -87,6 +90,7 @@ def test_initial_z_approximates_delta_times_diffusion() -> None:
     assert abs(z0 - reference) < 0.15 * reference
 
 
+@pytest.mark.slow
 def test_geometric_basket_matches_lognormal_closed_form() -> None:
     torch.manual_seed(4)
     dim, x0, sigma, maturity, strike = 5, 100.0, 0.2, 1.0, 100.0

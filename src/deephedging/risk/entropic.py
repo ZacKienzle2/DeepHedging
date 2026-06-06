@@ -13,6 +13,11 @@ class Entropic(RiskMeasure):
     Computed via ``logsumexp`` for numerical stability; a naive
     ``exp().mean().log()`` overflows for large losses or risk aversion.
 
+    The gradient weights samples by ``softmax(a * loss)``, so for large
+    risk aversion the effective gradient sample size collapses toward the
+    single worst path; scale the batch size with ``risk_aversion`` or the
+    updates become extremely high variance.
+
     Attributes:
         risk_aversion: Positive risk-aversion coefficient.
     """

@@ -26,3 +26,15 @@ class RiskMeasure(nn.Module, ABC):
         Returns:
             Scalar risk value.
         """
+
+    def warm_start(self, loss: torch.Tensor) -> None:
+        """Initialises auxiliary parameters from an initial loss sample.
+
+        Default is a no-op; risk measures with auxiliary state (the CVaR
+        threshold) override it so training does not spend its early
+        iterations dragging the auxiliary variable from an arbitrary
+        initial value to the right scale.
+
+        Args:
+            loss: Loss per path of shape ``(n_paths,)``.
+        """

@@ -9,7 +9,10 @@ def expected_shortfall(pnl: torch.Tensor, alpha: float = 0.95) -> torch.Tensor:
     Uses the Rockafellar-Uryasev form evaluated at the empirical quantile, so
     the number matches the training objective at its optimum. The plug-in
     estimator is finite-sample biased; use large evaluation samples and keep
-    it out of training losses.
+    it out of training losses. The estimate is clamped at the sample maximum:
+    when ``(1 - alpha) * n_paths`` falls below one, quantile interpolation
+    plus the ``1 / (1 - alpha)`` rescaling can otherwise overshoot the worst
+    observed loss, which no true tail mean can exceed.
 
     Args:
         pnl: PnL per path of shape ``(n_paths,)``; positive is profit.
@@ -23,7 +26,7 @@ def expected_shortfall(pnl: torch.Tensor, alpha: float = 0.95) -> torch.Tensor:
     loss = -pnl
     var = torch.quantile(loss, alpha)
     excess = torch.relu(loss - var)
-    return var + excess.mean() / (1.0 - alpha)
+    return torch.minimum(var + excess.mean() / (1.0 - alpha), loss.max())
 
 
 def pnl_summary(pnl: torch.Tensor, alphas: tuple[float, ...] = (0.95, 0.99)) -> dict[str, float]:
@@ -42,6 +45,6 @@ def pnl_summary(pnl: torch.Tensor, alphas: tuple[float, ...] = (0.95, 0.99)) -> 
         "std": float(pnl.std()),
     }
     for alpha in alphas:
-        key = f"es_{round(alpha * 100)}"
+        key = f"es_{int(alpha * 100 + 0.5)}"
         summary[key] = float(expected_shortfall(pnl, alpha))
     return summary

@@ -56,3 +56,7 @@ reportUnknownArgumentType = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: training-loop and large Monte Carlo tests (tens of seconds)",
+    "gpu: requires a CUDA device",
+]

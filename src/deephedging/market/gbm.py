@@ -63,5 +63,7 @@ class GBMSimulator:
             generator=generator,
         )
         log_returns = torch.cumsum(drift + diffusion * z, dim=0)
-        zero = log_returns.new_zeros((1, n_paths))
-        return self.s0 * torch.exp(torch.cat((zero, log_returns), dim=0))
+        out = log_returns.new_empty((self.n_steps + 1, n_paths))
+        out[0] = 0.0
+        out[1:] = log_returns
+        return out.exp_().mul_(self.s0)

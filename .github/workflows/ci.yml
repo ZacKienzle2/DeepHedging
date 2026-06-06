@@ -19,5 +19,8 @@ jobs:
         run: uv run ruff format --check .
       - name: Type check
         run: uv run pyright
-      - name: Tests
-        run: uv run pytest -q
+      - name: Fast tests
+        run: uv run pytest -q -m "not slow"
+      - name: Full tests
+        if: github.event_name == 'push'
+        run: uv run pytest -q -m "slow"

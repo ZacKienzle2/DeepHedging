@@ -62,8 +62,7 @@ def hedge_pnl(
             new_position, state = cast(tuple[torch.Tensor, torch.Tensor | None], output)
         else:
             new_position, state = policy(features, state)
-        pnl = pnl + new_position * (paths[t + 1] - spot)
-        pnl = pnl - cost_model(new_position - position, spot)
+        pnl = pnl + new_position * (paths[t + 1] - spot) - cost_model(new_position - position, spot)
         position = new_position
     if liquidate_terminal:
         pnl = pnl - cost_model(position, paths[-1])

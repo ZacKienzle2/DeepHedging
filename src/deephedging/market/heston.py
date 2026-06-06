@@ -85,7 +85,8 @@ class HestonSimulator:
         z_var = self.rho * z[0] + math.sqrt(1.0 - self.rho**2) * z[1]
         log_return = torch.zeros((n_paths,), dtype=self.dtype, device=self.device)
         variance = torch.full((n_paths,), self.v0, dtype=self.dtype, device=self.device)
-        rows = [log_return]
+        out = torch.empty((self.n_steps + 1, n_paths), dtype=self.dtype, device=self.device)
+        out[0] = 0.0
         for k in range(self.n_steps):
             variance_plus = torch.clamp(variance, min=0.0)
             vol = torch.sqrt(variance_plus)
@@ -97,5 +98,5 @@ class HestonSimulator:
                 + self.kappa * (self.theta - variance_plus) * dt
                 + self.xi * vol * sqrt_dt * z_var[k]
             )
-            rows.append(log_return)
-        return self.s0 * torch.exp(torch.stack(rows, dim=0))
+            out[k + 1] = log_return
+        return out.exp_().mul_(self.s0)

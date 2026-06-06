@@ -13,7 +13,6 @@ from deephedging.bsde import (
     ZeroGenerator,
     train_bsde,
 )
-from deephedging.features import DefaultFeatures, FeatureMap, RunningMaxFeatures
 from deephedging.evaluation import (
     bs_call_delta,
     bs_call_price,
@@ -23,6 +22,7 @@ from deephedging.evaluation import (
     expected_shortfall,
     pnl_summary,
 )
+from deephedging.features import DefaultFeatures, FeatureMap, RunningMaxFeatures
 from deephedging.frictions import CostModel, NoCost, ProportionalCost
 from deephedging.instruments import EuropeanCall, EuropeanPut, Payoff, UpAndOutCall
 from deephedging.market import GBMSimulator, HestonSimulator, PathSimulator

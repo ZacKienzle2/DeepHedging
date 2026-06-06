@@ -66,9 +66,13 @@ def test_zero_drift_terminal_mean_near_s0() -> None:
 def test_negative_rho_skews_left_tail() -> None:
     down = _simulator(rho=-0.9).simulate(100_000, generator=_make_generator())
     up = _simulator(rho=0.9).simulate(100_000, generator=_make_generator())
-    skew_down = float(((torch.log(down[-1] / 100.0)) ** 3).mean())
-    skew_up = float(((torch.log(up[-1] / 100.0)) ** 3).mean())
-    assert skew_down < skew_up
+
+    def central_third_moment(paths: torch.Tensor) -> float:
+        log_returns = torch.log(paths[-1] / 100.0)
+        centred = log_returns - log_returns.mean()
+        return float((centred**3).mean())
+
+    assert central_third_moment(down) < central_third_moment(up)
 
 
 def test_invalid_parameters_raise() -> None:

@@ -91,6 +91,18 @@ def train(
         risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
         param_groups.append({"params": risk_params, "lr": risk_lr})
     optimizer = torch.optim.Adam(param_groups)
+    with torch.no_grad():
+        warmup_paths = simulator.simulate(config.batch_paths, generator=generator).to(device)
+        warmup_pnl = hedge_pnl(
+            warmup_paths,
+            policy,
+            payoff,
+            cost_model,
+            premium=premium,
+            liquidate_terminal=config.liquidate_terminal,
+            feature_map=feature_map,
+        )
+        risk_measure.warm_start(-warmup_pnl)
     loss_history: list[torch.Tensor] = []
     for _ in range(config.n_iterations):
         paths = simulator.simulate(config.batch_paths, generator=generator).to(device)
@@ -109,4 +121,5 @@ def train(
         loss.backward()
         optimizer.step()
         loss_history.append(loss.detach())
-    return TrainResult(losses=[float(value) for value in loss_history])
+    recorded = torch.stack(loss_history).cpu() if loss_history else torch.empty(0)
+    return TrainResult(losses=recorded.tolist())

@@ -20,9 +20,14 @@ from deephedging.bsde.problem import BSDEProblem
 class DeepBSDESolver(nn.Module):
     """Learned ``(Y_0, Z)`` pair for a fixed BSDE problem.
 
+    The ``Z`` network consumes time normalised by the horizon, so the
+    input scale is invariant in the maturity: a raw calendar-time feature
+    would dominate the ``log(x / x0)`` channel for long-dated problems and
+    degrade conditioning. The generator still receives calendar time.
+
     Attributes:
         y0: Learned scalar value of the solution at inception.
-        z_net: Shared network mapping ``(t, log(x / x0))`` to ``Z_t``.
+        z_net: Shared network mapping ``(t / T, log(x / x0))`` to ``Z_t``.
     """
 
     def __init__(self, dim: int, hidden_sizes: tuple[int, ...] = (64, 64)) -> None:
@@ -61,21 +66,22 @@ class DeepBSDESolver(nn.Module):
         dtype = self.y0.dtype
         dt = problem.maturity / problem.n_steps
         sqrt_dt = math.sqrt(dt)
-        noise = torch.randn(
+        dw = torch.randn(
             (problem.n_steps, n_paths, problem.dim),
             dtype=dtype,
             device=device,
             generator=generator,
-        )
-        dw = sqrt_dt * noise
+        ).mul_(sqrt_dt)
+        times = torch.arange(problem.n_steps, dtype=dtype, device=device) * dt
+        scaled_times = times / problem.maturity
         log_x = torch.zeros((n_paths, problem.dim), dtype=dtype, device=device)
         y = self.y0.expand(n_paths)
         drift = (problem.mu - 0.5 * problem.sigma**2) * dt
         for k in range(problem.n_steps):
-            t = torch.full((n_paths, 1), k * dt, dtype=dtype, device=device)
+            t_col = scaled_times[k].expand(n_paths, 1)
             x = problem.x0 * torch.exp(log_x)
-            z = self.z_net(torch.cat((t, log_x), dim=1))
-            f = problem.generator(t[0, 0], x, y, z)
+            z = self.z_net(torch.cat((t_col, log_x), dim=1))
+            f = problem.generator(times[k], x, y, z)
             y = y - f * dt + (z * dw[k]).sum(dim=1)
             log_x = log_x + drift + problem.sigma * dw[k]
         terminal = problem.terminal(problem.x0 * torch.exp(log_x))
@@ -163,5 +169,5 @@ def train_bsde(
         loss.backward()
         optimizer.step()
         loss_history.append(loss.detach())
-    losses = [float(value) for value in loss_history]
+    losses = torch.stack(loss_history).cpu().tolist()
     return BSDEResult(y0=float(solver.y0.detach()), final_loss=losses[-1], losses=losses)

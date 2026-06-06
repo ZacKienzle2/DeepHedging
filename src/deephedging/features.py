@@ -66,9 +66,7 @@ class DefaultFeatures:
         """
         spot = paths[t]
         n_paths = spot.shape[0]
-        return torch.stack(
-            (torch.log(spot / paths[0]), tau.expand(n_paths), position), dim=-1
-        )
+        return torch.stack((torch.log(spot / paths[0]), tau.expand(n_paths), position), dim=-1)
 
 
 @dataclass(frozen=True)

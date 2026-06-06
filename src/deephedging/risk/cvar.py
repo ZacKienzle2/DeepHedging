@@ -38,6 +38,20 @@ class CVaR(RiskMeasure):
         self.alpha = alpha
         self.threshold = nn.Parameter(torch.zeros(()))
 
+    def warm_start(self, loss: torch.Tensor) -> None:
+        """Initialises the threshold at the empirical alpha-quantile.
+
+        Without this, a threshold starting at zero lags the true VaR for
+        hundreds of iterations and the indicator fires on far more than the
+        target tail fraction, so early training optimises something between
+        the mean loss and the intended CVaR.
+
+        Args:
+            loss: Loss per path of shape ``(n_paths,)``.
+        """
+        with torch.no_grad():
+            self.threshold.copy_(torch.quantile(loss, self.alpha))
+
     def forward(self, loss: torch.Tensor) -> torch.Tensor:
         """Evaluates the Rockafellar-Uryasev objective.
 
