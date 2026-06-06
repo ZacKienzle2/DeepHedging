@@ -92,6 +92,7 @@ void check_arguments(const int64_t n_paths, const int64_t n_steps,
   TORCH_CHECK(n_paths > 0, "n_paths must be positive");
   TORCH_CHECK(n_paths < (1LL << 32), "n_paths must be below 2^32");
   TORCH_CHECK(n_steps > 0, "n_steps must be positive");
+  TORCH_CHECK(n_steps < (1LL << 31), "n_steps must be below 2^31");
   TORCH_CHECK(stream >= 0 && stream < (1LL << 32),
               "stream must lie in [0, 2^32)");
 }
