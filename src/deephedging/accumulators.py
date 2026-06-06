@@ -18,7 +18,11 @@ from deephedging.market.state import MarketState
 
 @runtime_checkable
 class PathAccumulator(Protocol):
-    """Folds a per-path statistic over the spot grid one step at a time."""
+    """Folds a per-path statistic over the spot grid one step at a time.
+
+    Folds broadcast elementwise, so on a trailing-asset grid the carry
+    keeps the asset axis and callers contract it themselves.
+    """
 
     def init(self, spot0: torch.Tensor) -> torch.Tensor:
         """Initialises the fold state from the inception spot.

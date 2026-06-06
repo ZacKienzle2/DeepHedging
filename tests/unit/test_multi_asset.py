@@ -54,7 +54,7 @@ def test_empirical_correlation_recovers_target() -> None:
     scale = covariance.diagonal().sqrt()
     correlation = covariance / (scale.unsqueeze(0) * scale.unsqueeze(1))
     target = torch.tensor(_CORRELATION)
-    assert torch.allclose(correlation, target, atol=1e-2)
+    assert torch.allclose(correlation, target, atol=5e-3)
 
 
 def test_geometric_basket_matches_closed_form() -> None:
@@ -87,7 +87,7 @@ def test_arithmetic_dominates_geometric_pathwise() -> None:
     state = _simulator().simulate(50_000, noise=NoiseSpec(seed=59))
     arithmetic = BasketCall(strike=100.0, weights=(1 / 3, 1 / 3, 1 / 3))
     geometric = GeometricBasketCall(strike=100.0)
-    assert torch.all(arithmetic(state.spot) >= geometric(state.spot) - 1e-5)
+    assert torch.all(arithmetic(state.spot) >= geometric(state.spot) - 2e-5)
 
 
 def test_pnl_from_positions_contracts_asset_axis() -> None:

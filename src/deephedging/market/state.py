@@ -73,7 +73,8 @@ class MarketState:
             t: Index of the current rebalancing date.
 
         Returns:
-            ``log(spot[t] / spot[0])`` of shape ``(n_paths,)``.
+            ``log(spot[t] / spot[0])`` of shape ``(n_paths,)``, with a
+            trailing asset axis when the spot grid carries one.
         """
         cached = self._cache.get("log_relative")
         if cached is None:
