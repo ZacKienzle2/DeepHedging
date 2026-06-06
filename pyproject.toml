@@ -62,3 +62,8 @@ markers = [
     "slow: training-loop and large Monte Carlo tests (tens of seconds)",
     "gpu: requires a CUDA device",
 ]
+
+[dependency-groups]
+dev = [
+    "ninja>=1.13.0",
+]

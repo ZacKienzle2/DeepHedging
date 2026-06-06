@@ -91,6 +91,33 @@ def main() -> None:
         / 1e6,
         "train_step_mpaths_per_s": args.paths / _timed(train_step, args.repeats, args.device) / 1e6,
     }
+    if args.device == "cuda":
+        from deephedging.market import CudaGBMSimulator, CudaHestonSimulator, kernels_available
+
+        if kernels_available():
+            fused_gbm = CudaGBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=args.steps)
+            fused_heston = CudaHestonSimulator(
+                s0=100.0,
+                v0=0.04,
+                kappa=1.5,
+                theta=0.04,
+                xi=0.5,
+                rho=-0.7,
+                maturity=0.25,
+                n_steps=args.steps,
+            )
+            results["fused_gbm_mpaths_per_s"] = (
+                args.paths
+                / _timed(lambda: fused_gbm.simulate(args.paths, noise=noise), args.repeats, "cuda")
+                / 1e6
+            )
+            results["fused_heston_mpaths_per_s"] = (
+                args.paths
+                / _timed(
+                    lambda: fused_heston.simulate(args.paths, noise=noise), args.repeats, "cuda"
+                )
+                / 1e6
+            )
     for key, value in results.items():
         print(f"{key}: {value if isinstance(value, str | int) else f'{value:.3f}'}")
     if args.json:
