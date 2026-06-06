@@ -10,7 +10,7 @@ every comparison is paired. Each run appends a full-provenance record,
 and the learned positions against the model delta on a spot grid are
 stored alongside so the band figure regenerates from the store alone.
 
-    uv run python experiments/run_hedging_frontier.py [--smoke]
+    uv run python experiments/hedging_frontier.py [--smoke]
 """
 
 import argparse

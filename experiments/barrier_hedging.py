@@ -12,7 +12,7 @@ premium and score on common evaluation paths so comparisons are paired,
 and every run appends a full-provenance record so the table regenerates
 from the store alone.
 
-    uv run python experiments/run_barrier_hedging.py [--smoke]
+    uv run python experiments/barrier_hedging.py [--smoke]
 """
 
 import argparse
