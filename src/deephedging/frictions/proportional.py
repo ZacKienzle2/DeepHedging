@@ -1,6 +1,6 @@
 """Proportional transaction costs."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 
@@ -41,16 +41,18 @@ class PerAssetProportionalCost:
     scale is hundreds of times below the spot. One rate per asset
     broadcasts against the trailing axis the engine contracts, so the
     per-step cost is the rate-weighted traded notional summed over
-    assets. The rate tensor is materialised per call, which keeps the
-    model stateless but means episode graph capture would bake one
-    allocation per step into the graph; prefer the scalar model inside
-    captured episodes until the rates are cached per device.
+    assets. The rate tensor is cached per device and dtype, so a
+    captured episode allocates it once at capture rather than once per
+    replayed step, keeping the model safe inside CUDA graphs.
 
     Attributes:
         rates: Proportional cost rate per asset.
     """
 
     rates: tuple[float, ...]
+    _cache: dict[tuple[torch.device, torch.dtype], torch.Tensor] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if not self.rates:
@@ -76,7 +78,11 @@ class PerAssetProportionalCost:
             raise ValueError(
                 f"trade has {trade.shape[-1]} assets, cost model has {len(self.rates)} rates"
             )
-        rates = price.new_tensor(self.rates)
+        key = (price.device, price.dtype)
+        rates = self._cache.get(key)
+        if rates is None:
+            rates = price.new_tensor(self.rates)
+            self._cache[key] = rates
         return rates * price * trade.abs()
 
 
