@@ -2,7 +2,7 @@
 
 import warnings
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Protocol, cast
 
 import torch
 from torch.utils.checkpoint import checkpoint
@@ -79,6 +79,15 @@ class TrainConfig:
             excludes ``graph_episode``, whose capture freezes the noise
             pair at capture time so a replayed regeneration would train
             every iteration on the same batch.
+        graph_generate: Whether the captured graph also generates its
+            batch. The fused kernels offer an offset variant that reads
+            the shifted Philox subsequence from device memory at launch
+            rather than from a frozen host argument, so updating one
+            element in place redraws a fresh batch on every replay and
+            the entire training iteration, generation included, becomes
+            a single graph launch. Requires ``graph_episode``, a seed
+            to address the streams, and a simulator exposing
+            ``simulate_with_offset``.
     """
 
     n_iterations: int = 2000
@@ -92,6 +101,7 @@ class TrainConfig:
     amp: bool = False
     graph_episode: bool = False
     regenerate_paths: bool = False
+    graph_generate: bool = False
 
     def __post_init__(self) -> None:
         if self.compile_policy and self.checkpoint_steps:
@@ -102,6 +112,18 @@ class TrainConfig:
             raise ValueError("regenerate_paths and graph_episode are mutually exclusive")
         if self.regenerate_paths and self.seed is None:
             raise ValueError("regenerate_paths requires a seed for deterministic replay")
+        if self.graph_generate and not self.graph_episode:
+            raise ValueError("graph_generate requires graph_episode")
+        if self.graph_generate and self.seed is None:
+            raise ValueError("graph_generate requires a seed to address the streams")
+
+
+class _OffsetSimulator(Protocol):
+    """Simulator whose kernel reads the Philox subsequence from the device."""
+
+    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+        """Simulates a batch addressed by the device-resident offset."""
+        ...
 
 
 def _importance_weights(state: MarketState) -> torch.Tensor | None:
@@ -179,6 +201,47 @@ class TrainResult:
     losses: list[float] = field(default_factory=list)
 
 
+class _GeneratedEpisodeLoss(torch.nn.Module):
+    """Episode loss that generates its own batch inside the capture.
+
+    The simulator kernel reads the shifted Philox subsequence from the
+    offset tensor at launch time, so capturing this module records
+    generation, the episode forward, and the backward as one replayable
+    unit, and updating the offset in place redraws a fresh batch on
+    every replay. A host-argument kernel could not do this, because
+    capture freezes launch arguments and every replay would train on
+    the same paths.
+    """
+
+    def __init__(
+        self,
+        simulator: _OffsetSimulator,
+        episode: _EpisodeLoss,
+        n_paths: int,
+        seed: int,
+        aux_keys: tuple[str, ...],
+    ) -> None:
+        super().__init__()
+        self.simulator = simulator
+        self.episode = episode
+        self.n_paths = n_paths
+        self.seed = seed
+        self.aux_keys = aux_keys
+
+    def forward(self, offset: torch.Tensor) -> torch.Tensor:
+        """Generates the batch the offset names and scores the episode.
+
+        Args:
+            offset: One-element int64 CUDA tensor holding the shifted
+                subsequence base.
+
+        Returns:
+            Scalar risk objective.
+        """
+        state = self.simulator.simulate_with_offset(self.n_paths, self.seed, offset)
+        return self.episode(state.spot, *(state.aux[key] for key in self.aux_keys))
+
+
 def train(
     simulator: PathSimulator,
     policy: HedgePolicy,
@@ -248,6 +311,7 @@ def train(
         )
         risk_measure.warm_start(-warmup_pnl, weights=_importance_weights(warmup_state))
     graphed_loss = None
+    offset_input = torch.empty(0, dtype=torch.int64)
     aux_keys: tuple[str, ...] = ()
     if config.graph_episode:
         aux_keys = tuple(sorted(warmup_state.aux))
@@ -262,11 +326,27 @@ def train(
             aux_keys,
             config.checkpoint_steps,
         )
-        sample_args = (
-            warmup_state.spot.clone(),
-            *(warmup_state.aux[key].clone() for key in aux_keys),
-        )
-        graphed_loss = torch.cuda.make_graphed_callables(episode, sample_args)
+        if config.graph_generate:
+            if not hasattr(simulator, "simulate_with_offset"):
+                raise ValueError(
+                    "graph_generate requires a simulator exposing simulate_with_offset"
+                )
+            assert config.seed is not None
+            offset_input = torch.zeros((1,), dtype=torch.int64, device=device)
+            generated = _GeneratedEpisodeLoss(
+                cast(_OffsetSimulator, simulator),
+                episode,
+                config.batch_paths,
+                config.seed,
+                aux_keys,
+            )
+            graphed_loss = torch.cuda.make_graphed_callables(generated, (offset_input,))
+        else:
+            sample_args = (
+                warmup_state.spot.clone(),
+                *(warmup_state.aux[key].clone() for key in aux_keys),
+            )
+            graphed_loss = torch.cuda.make_graphed_callables(episode, sample_args)
         reserved = torch.cuda.memory_reserved(device)
         capacity = torch.cuda.get_device_properties(device).total_memory
         if reserved > 0.8 * capacity:
@@ -302,7 +382,13 @@ def train(
 
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
-        if graphed_loss is not None:
+        if graphed_loss is not None and config.graph_generate:
+            assert base_noise is not None
+            spec = base_noise.child(iteration + 1)
+            offset_input.fill_(spec.stream << 32)
+            loss = cast(torch.Tensor, graphed_loss(offset_input))
+            optimizer.zero_grad(set_to_none=False)
+        elif graphed_loss is not None:
             state = batch_state(iteration + 1)
             channels = (state.spot, *(state.aux[key] for key in aux_keys))
             loss = cast(torch.Tensor, graphed_loss(*channels))

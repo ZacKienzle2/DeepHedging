@@ -153,6 +153,36 @@ class CudaGBMSimulator:
         )
         return MarketState(spot=spot)
 
+    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+        """Simulates GBM paths reading the stream offset from the device.
+
+        The kernel reads the shifted Philox subsequence from the offset
+        tensor at launch, so the call is capturable in a CUDA graph and
+        every replay draws the batch the offset names at replay time.
+        Writing ``stream << 32`` into the tensor reproduces
+        :meth:`simulate` with that stream bitwise.
+
+        Args:
+            n_paths: Number of independent paths.
+            seed: Philox seed shared with the offset's stream family.
+            offset: One-element int64 CUDA tensor holding the shifted
+                subsequence base.
+
+        Returns:
+            Market state whose spot grid satisfies ``spot[0] == s0``.
+        """
+        spot = _kernels().gbm_paths_offset(
+            n_paths,
+            self.n_steps,
+            self.s0,
+            self.mu,
+            self.sigma,
+            self.maturity,
+            seed,
+            offset,
+        )
+        return MarketState(spot=spot)
+
     def simulate_folds(self, n_paths: int, noise: NoiseSpec | None = None) -> PathFolds:
         """Computes per-path statistics in registers, never the grid.
 
@@ -253,6 +283,40 @@ class CudaHestonSimulator:
             self.maturity,
             spec.seed,
             spec.stream,
+        )
+        return MarketState(spot=spot, aux={"variance": variance})
+
+    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+        """Simulates Heston paths reading the stream offset from the device.
+
+        The kernel reads the shifted Philox subsequence from the offset
+        tensor at launch, so the call is capturable in a CUDA graph and
+        every replay draws the batch the offset names at replay time.
+        Writing ``stream << 32`` into the tensor reproduces
+        :meth:`simulate` with that stream bitwise.
+
+        Args:
+            n_paths: Number of independent paths.
+            seed: Philox seed shared with the offset's stream family.
+            offset: One-element int64 CUDA tensor holding the shifted
+                subsequence base.
+
+        Returns:
+            Market state with the clamped ``variance`` channel attached.
+        """
+        spot, variance = _kernels().heston_paths_offset(
+            n_paths,
+            self.n_steps,
+            self.s0,
+            self.v0,
+            self.kappa,
+            self.theta,
+            self.xi,
+            self.rho,
+            self.mu,
+            self.maturity,
+            seed,
+            offset,
         )
         return MarketState(spot=spot, aux={"variance": variance})
 
