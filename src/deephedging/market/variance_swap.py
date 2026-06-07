@@ -82,7 +82,37 @@ class HestonVarianceSwapSimulator:
             ``(n_steps + 1, n_paths, 2)`` holding spot then swap value,
             with the clamped ``variance`` channel attached.
         """
-        state = self.heston.simulate(n_paths, noise=noise)
+        return self._extend(self.heston.simulate(n_paths, noise=noise))
+
+    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+        """Simulates the two-asset market addressed by a device offset.
+
+        Delegates generation to the wrapped sampler's offset entry
+        point and builds the swap from the generated variance with
+        tensor operations only, so the whole construction is capturable
+        in a CUDA graph and replays draw fresh batches as the offset
+        updates.
+
+        Args:
+            n_paths: Number of independent paths.
+            seed: Philox seed shared with the offset's stream family.
+            offset: One-element int64 CUDA tensor holding the shifted
+                subsequence base.
+
+        Returns:
+            Market state whose spot grid has shape
+            ``(n_steps + 1, n_paths, 2)`` holding spot then swap value,
+            with the clamped ``variance`` channel attached.
+
+        Raises:
+            AttributeError: If the wrapped sampler offers no offset
+                entry point, which the eager sampler does not.
+        """
+        if not isinstance(self.heston, CudaHestonSimulator):
+            raise AttributeError("simulate_with_offset requires the fused Heston sampler")
+        return self._extend(self.heston.simulate_with_offset(n_paths, seed, offset))
+
+    def _extend(self, state: MarketState) -> MarketState:
         variance = state.aux["variance"]
         dt = self.heston.maturity / self.heston.n_steps
         accrued = variance.new_zeros(variance.shape)

@@ -182,6 +182,7 @@ def main() -> None:
                     seed=seed,
                     checkpoint_steps=(arguments.device == "cuda"),
                     graph_episode=(arguments.device == "cuda"),
+                    graph_generate=(arguments.fused and arguments.device == "cuda"),
                 )
                 started = time.perf_counter()
                 result = train(
