@@ -115,17 +115,47 @@ def main() -> None:
                 maturity=0.25,
                 n_steps=args.steps,
             )
+
+            def gen_fused_gbm() -> None:
+                fused_gbm.simulate(args.paths, noise=noise)
+
+            def gen_fused_heston() -> None:
+                fused_heston.simulate(args.paths, noise=noise)
+
             results["fused_gbm_mpaths_per_s"] = (
-                args.paths
-                / _timed(lambda: fused_gbm.simulate(args.paths, noise=noise), args.repeats, "cuda")
-                / 1e6
+                args.paths / _timed(gen_fused_gbm, args.repeats, "cuda") / 1e6
             )
             results["fused_heston_mpaths_per_s"] = (
-                args.paths
-                / _timed(
-                    lambda: fused_heston.simulate(args.paths, noise=noise), args.repeats, "cuda"
+                args.paths / _timed(gen_fused_heston, args.repeats, "cuda") / 1e6
+            )
+
+            from deephedging import TrainConfig, train
+
+            generated_iterations = 200
+
+            def generated_training() -> None:
+                graphed_policy = FeedForwardPolicy(hidden_sizes=(64, 64)).to("cuda")
+                train(
+                    fused_heston,
+                    graphed_policy,
+                    payoff,
+                    cost,
+                    CVaR(alpha=0.95),
+                    TrainConfig(
+                        n_iterations=generated_iterations,
+                        batch_paths=args.paths,
+                        seed=1,
+                        graph_episode=True,
+                        graph_generate=True,
+                    ),
+                    premium=4.0,
                 )
-                / 1e6
+
+            start = time.perf_counter()
+            generated_training()
+            torch.cuda.synchronize()
+            results["generated_train_step_mpaths_per_s"] = (
+                generated_iterations * args.paths / (time.perf_counter() - start) / 1e6
             )
 
             from deephedging import UpAndOutCall

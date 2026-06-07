@@ -1,0 +1,13 @@
+{
+  "device": "cuda",
+  "paths": 65536,
+  "steps": 30,
+  "gbm_generate_mpaths_per_s": 873.1148412577439,
+  "heston_generate_mpaths_per_s": 15.466507445550231,
+  "train_step_mpaths_per_s": 3.34124680366551,
+  "fused_gbm_mpaths_per_s": 5982.291331435846,
+  "fused_heston_mpaths_per_s": 3451.0795504864263,
+  "generated_train_step_mpaths_per_s": 4.815236178460816,
+  "fold_price_mpaths_per_s": 227.64250243125616,
+  "grid_price_mpaths_per_s": 254.58288820209378
+}
