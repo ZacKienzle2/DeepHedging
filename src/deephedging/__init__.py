@@ -36,7 +36,7 @@ from deephedging.features import (
     RunningMaxFeatures,
     VarianceFeatures,
 )
-from deephedging.frictions import CostModel, NoCost, ProportionalCost
+from deephedging.frictions import CostModel, NoCost, PerAssetProportionalCost, ProportionalCost
 from deephedging.instruments import (
     BasketCall,
     EuropeanCall,
@@ -109,6 +109,7 @@ __all__ = [
     "PathAccumulator",
     "Payoff",
     "PathSimulator",
+    "PerAssetProportionalCost",
     "PriceEstimate",
     "Pricer",
     "ProportionalCost",

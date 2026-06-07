@@ -5,7 +5,7 @@ import math
 import pytest
 import torch
 
-from deephedging.frictions import ProportionalCost
+from deephedging.frictions import PerAssetProportionalCost, ProportionalCost
 from deephedging.instruments import EuropeanCall, SingleAssetPayoff
 from deephedging.market import HestonSimulator, HestonVarianceSwapSimulator, NoiseSpec
 from deephedging.training import pnl_from_positions
@@ -101,6 +101,36 @@ def test_single_asset_payoff_reads_one_column() -> None:
 def test_single_asset_payoff_rejects_negative_index() -> None:
     with pytest.raises(ValueError):
         SingleAssetPayoff(inner=EuropeanCall(strike=100.0), asset=-1)
+
+
+def test_per_asset_cost_rates_apply_on_the_trailing_axis() -> None:
+    trade = torch.tensor([[2.0, -10.0], [0.0, 4.0]])
+    price = torch.tensor([[100.0, 0.04], [100.0, 0.04]])
+    cost = PerAssetProportionalCost(rates=(1e-3, 5e-2))
+    expected = torch.tensor([[1e-3 * 100.0 * 2.0, 5e-2 * 0.04 * 10.0], [0.0, 5e-2 * 0.04 * 4.0]])
+    assert torch.allclose(cost(trade, price), expected)
+
+
+def test_per_asset_cost_validates_rates_and_width() -> None:
+    with pytest.raises(ValueError):
+        PerAssetProportionalCost(rates=())
+    with pytest.raises(ValueError):
+        PerAssetProportionalCost(rates=(1e-3, -1.0))
+    cost = PerAssetProportionalCost(rates=(1e-3,))
+    with pytest.raises(ValueError):
+        cost(torch.zeros((4, 2)), torch.ones((4, 2)))
+
+
+def test_per_asset_cost_matches_scalar_when_rates_equal() -> None:
+    sim = _simulator(n_steps=3)
+    state = sim.simulate(32, noise=NoiseSpec(seed=71))
+    positions = torch.full((3, 32, 2), 0.5)
+    payoff = SingleAssetPayoff(inner=EuropeanCall(strike=100.0))
+    scalar = pnl_from_positions(state, positions, payoff, ProportionalCost(rate=1e-3))
+    vector = pnl_from_positions(
+        state, positions, payoff, PerAssetProportionalCost(rates=(1e-3, 1e-3))
+    )
+    assert torch.allclose(scalar, vector, atol=1e-6)
 
 
 def test_two_asset_pnl_contracts_asset_axis() -> None:
