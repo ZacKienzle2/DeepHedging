@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import cast
 
 import torch
+from torch.utils.checkpoint import checkpoint
 
 from deephedging.features import FeatureMap
 from deephedging.frictions.base import CostModel
@@ -64,6 +65,20 @@ class TrainConfig:
             footprint and lifts the batch ceiling. Requires CUDA and a
             fixed batch size; mutually exclusive with compilation and
             autocast.
+        regenerate_paths: Whether to drop the path grid after the
+            forward pass and regenerate it from its noise stream inside
+            the backward. Every simulator replays bitwise from a
+            ``NoiseSpec``, so the regenerated grid is the recompute
+            contract gradient checkpointing needs, and combining this
+            flag with ``checkpoint_steps`` reduces peak activation
+            memory to roughly one rebalancing step. The lever matters
+            for batches large enough that the grid and its derived
+            caches crowd device memory; small batches pay recompute for
+            nothing. Requires a seed, because an unseeded recompute
+            would draw fresh paths and silently corrupt gradients, and
+            excludes ``graph_episode``, whose capture freezes the noise
+            pair at capture time so a replayed regeneration would train
+            every iteration on the same batch.
     """
 
     n_iterations: int = 2000
@@ -76,6 +91,7 @@ class TrainConfig:
     compile_policy: bool = False
     amp: bool = False
     graph_episode: bool = False
+    regenerate_paths: bool = False
 
 
 def _importance_weights(state: MarketState) -> torch.Tensor | None:
@@ -193,6 +209,10 @@ def train(
         raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
     if config.graph_episode and (config.compile_policy or config.amp):
         raise ValueError("graph_episode excludes compilation and autocast")
+    if config.regenerate_paths and config.graph_episode:
+        raise ValueError("regenerate_paths and graph_episode are mutually exclusive")
+    if config.regenerate_paths and config.seed is None:
+        raise ValueError("regenerate_paths requires a seed for deterministic replay")
     device = next(policy.parameters()).device
     if config.graph_episode and device.type != "cuda":
         raise ValueError("graph_episode requires the policy on a CUDA device")
@@ -254,26 +274,42 @@ def train(
                 "page through the host and collapse throughput",
                 stacklevel=2,
             )
+
+    def episode_loss(state: MarketState) -> torch.Tensor:
+        pnl = hedge_pnl(
+            state,
+            stepper,
+            payoff,
+            cost_model,
+            premium=premium,
+            liquidate_terminal=config.liquidate_terminal,
+            checkpoint_steps=config.checkpoint_steps,
+            feature_map=feature_map,
+            amp=config.amp,
+        )
+        return risk_measure(-pnl, weights=_importance_weights(state))
+
+    def regenerated_loss(index: int) -> torch.Tensor:
+        def from_noise(*_parameters: torch.Tensor) -> torch.Tensor:
+            return episode_loss(batch_state(index))
+
+        return cast(
+            torch.Tensor,
+            checkpoint(from_noise, *policy.parameters(), *risk_params, use_reentrant=False),
+        )
+
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
-        state = batch_state(iteration + 1)
         if graphed_loss is not None:
+            state = batch_state(iteration + 1)
             channels = (state.spot, *(state.aux[key] for key in aux_keys))
             loss = cast(torch.Tensor, graphed_loss(*channels))
             optimizer.zero_grad(set_to_none=False)
+        elif config.regenerate_paths:
+            loss = regenerated_loss(iteration + 1)
+            optimizer.zero_grad(set_to_none=True)
         else:
-            pnl = hedge_pnl(
-                state,
-                stepper,
-                payoff,
-                cost_model,
-                premium=premium,
-                liquidate_terminal=config.liquidate_terminal,
-                checkpoint_steps=config.checkpoint_steps,
-                feature_map=feature_map,
-                amp=config.amp,
-            )
-            loss = risk_measure(-pnl, weights=_importance_weights(state))
+            loss = episode_loss(batch_state(iteration + 1))
             optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
