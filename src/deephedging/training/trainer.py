@@ -1,5 +1,6 @@
 """Training loop for hedging policies."""
 
+import os
 import warnings
 from dataclasses import dataclass, field
 from typing import Protocol, cast
@@ -60,7 +61,8 @@ class TrainConfig:
             device memory degrades silently into host paging at a
             throughput collapse of more than an order of magnitude, so
             the trainer warns when the post-capture reservation
-            approaches the device capacity. Combining capture with
+            approaches the device capacity, tightening the threshold on
+            Windows where the display driver pages under pressure. Combining capture with
             gradient checkpointing trades replayed recompute for that
             footprint and lifts the batch ceiling. Requires CUDA and a
             fixed batch size; mutually exclusive with compilation and
@@ -349,7 +351,8 @@ def train(
             graphed_loss = torch.cuda.make_graphed_callables(episode, sample_args)
         reserved = torch.cuda.memory_reserved(device)
         capacity = torch.cuda.get_device_properties(device).total_memory
-        if reserved > 0.8 * capacity:
+        headroom = 0.7 if os.name == "nt" else 0.8
+        if reserved > headroom * capacity:
             warnings.warn(
                 f"graph capture reserves {reserved / 2**30:.1f}GiB of "
                 f"{capacity / 2**30:.1f}GiB; batches beyond physical memory "
