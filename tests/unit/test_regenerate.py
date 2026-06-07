@@ -170,6 +170,29 @@ def test_regeneration_cuts_peak_memory_at_scale() -> None:
     assert regenerated < 0.5 * stored
 
 
+def test_evaluation_never_routes_through_regeneration() -> None:
+    torch.manual_seed(47)
+    sim = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=6)
+    policy = FeedForwardPolicy(hidden_sizes=(8,))
+    config = TrainConfig(n_iterations=2, batch_paths=256, seed=13, regenerate_paths=True)
+    train(
+        sim,
+        policy,
+        EuropeanCall(strike=_STRIKE),
+        ProportionalCost(rate=1e-3),
+        CVaR(alpha=0.9),
+        config,
+    )
+    from deephedging.market import NoiseSpec
+    from deephedging.training import hedge_pnl
+
+    state = sim.simulate(1024, noise=NoiseSpec(seed=99))
+    with torch.no_grad():
+        pnl = hedge_pnl(state, policy, EuropeanCall(strike=_STRIKE), ProportionalCost(rate=1e-3))
+    assert pnl.shape == (1024,)
+    assert torch.isfinite(pnl).all()
+
+
 def test_regeneration_requires_a_seed() -> None:
     sim = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=5)
     policy = FeedForwardPolicy(hidden_sizes=(8,))

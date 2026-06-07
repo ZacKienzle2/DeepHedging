@@ -59,6 +59,22 @@ def test_swap_value_strictly_positive() -> None:
     assert torch.all(state.spot[..., 1] > 0.0)
 
 
+def test_swap_value_positive_under_stressed_variance() -> None:
+    heston = HestonSimulator(
+        s0=100.0,
+        v0=0.001,
+        kappa=1.5,
+        theta=0.04,
+        xi=1.0,
+        rho=-0.9,
+        maturity=0.25,
+        n_steps=30,
+    )
+    sim = HestonVarianceSwapSimulator(heston=heston, vs_maturity=1.0)
+    state = sim.simulate(200_000, noise=NoiseSpec(seed=73))
+    assert torch.all(state.spot[..., 1] > 0.0)
+
+
 def test_initial_swap_value_closed_form() -> None:
     sim = _simulator(vs_maturity=2.0)
     decay = (1.0 - math.exp(-_KAPPA * 2.0)) / _KAPPA
