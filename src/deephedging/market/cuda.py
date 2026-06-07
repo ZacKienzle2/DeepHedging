@@ -13,6 +13,7 @@ and the fallback wherever no toolchain or device exists.
 import glob
 import os
 import shutil
+import warnings
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -69,6 +70,10 @@ def _kernels() -> Any:
 def kernels_available() -> bool:
     """Reports whether the fused generators can run here.
 
+    A broken toolchain warns with the underlying error so it stays
+    distinguishable from the no-device case; silent fallback would make
+    a misconfigured compiler look like a CPU-only machine.
+
     Returns:
         True when a CUDA device exists and the extension compiles.
     """
@@ -76,7 +81,11 @@ def kernels_available() -> bool:
         return False
     try:
         _kernels()
-    except (RuntimeError, OSError, ImportError):
+    except (RuntimeError, OSError, ImportError) as error:
+        warnings.warn(
+            f"CUDA device present but the kernel extension failed to build: {error}",
+            stacklevel=2,
+        )
         return False
     return True
 

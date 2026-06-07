@@ -93,6 +93,16 @@ class TrainConfig:
     graph_episode: bool = False
     regenerate_paths: bool = False
 
+    def __post_init__(self) -> None:
+        if self.compile_policy and self.checkpoint_steps:
+            raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
+        if self.graph_episode and (self.compile_policy or self.amp):
+            raise ValueError("graph_episode excludes compilation and autocast")
+        if self.regenerate_paths and self.graph_episode:
+            raise ValueError("regenerate_paths and graph_episode are mutually exclusive")
+        if self.regenerate_paths and self.seed is None:
+            raise ValueError("regenerate_paths requires a seed for deterministic replay")
+
 
 def _importance_weights(state: MarketState) -> torch.Tensor | None:
     log_weight = state.aux.get(LOG_WEIGHT_CHANNEL)
@@ -205,14 +215,6 @@ def train(
         ValueError: If the config combines mutually exclusive options or
             requests episode capture off the CUDA device.
     """
-    if config.compile_policy and config.checkpoint_steps:
-        raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
-    if config.graph_episode and (config.compile_policy or config.amp):
-        raise ValueError("graph_episode excludes compilation and autocast")
-    if config.regenerate_paths and config.graph_episode:
-        raise ValueError("regenerate_paths and graph_episode are mutually exclusive")
-    if config.regenerate_paths and config.seed is None:
-        raise ValueError("regenerate_paths requires a seed for deterministic replay")
     device = next(policy.parameters()).device
     if config.graph_episode and device.type != "cuda":
         raise ValueError("graph_episode requires the policy on a CUDA device")

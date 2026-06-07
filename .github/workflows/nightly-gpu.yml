@@ -16,11 +16,20 @@ jobs:
           cache-dependency-glob: uv.lock
       - name: Install dependencies
         run: uv sync --extra dev
+      - name: Install CUDA torch on Linux runners
+        if: runner.os == 'Linux'
+        run: uv pip install --reinstall torch --index-url https://download.pytorch.org/whl/cu126
+      - name: Require a CUDA device
+        shell: bash
+        run: uv run python -c "import torch; assert torch.cuda.is_available(), 'CUDA unavailable; the GPU lane must fail rather than skip'"
       - name: GPU test suite
+        shell: bash
         run: uv run pytest -q -m gpu
       - name: Benchmark
+        shell: bash
         run: uv run python benchmarks/bench_paths.py --device cuda --json current.json
       - name: Regression gate
+        shell: bash
         run: |
           if [ -f benchmarks/baseline_cuda.json ]; then
             uv run python benchmarks/compare_baseline.py benchmarks/baseline_cuda.json current.json

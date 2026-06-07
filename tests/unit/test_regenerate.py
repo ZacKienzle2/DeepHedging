@@ -194,32 +194,12 @@ def test_evaluation_never_routes_through_regeneration() -> None:
 
 
 def test_regeneration_requires_a_seed() -> None:
-    sim = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=5)
-    policy = FeedForwardPolicy(hidden_sizes=(8,))
-    config = TrainConfig(n_iterations=1, batch_paths=8, regenerate_paths=True)
     with pytest.raises(ValueError, match="seed"):
-        train(
-            sim,
-            policy,
-            EuropeanCall(strike=_STRIKE),
-            ProportionalCost(rate=1e-3),
-            CVaR(alpha=0.9),
-            config,
-        )
+        TrainConfig(n_iterations=1, batch_paths=8, regenerate_paths=True)
 
 
 def test_regeneration_excludes_graph_capture() -> None:
-    sim = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=5)
-    policy = FeedForwardPolicy(hidden_sizes=(8,))
-    config = TrainConfig(
-        n_iterations=1, batch_paths=8, seed=1, regenerate_paths=True, graph_episode=True
-    )
     with pytest.raises(ValueError, match="mutually exclusive"):
-        train(
-            sim,
-            policy,
-            EuropeanCall(strike=_STRIKE),
-            ProportionalCost(rate=1e-3),
-            CVaR(alpha=0.9),
-            config,
+        TrainConfig(
+            n_iterations=1, batch_paths=8, seed=1, regenerate_paths=True, graph_episode=True
         )

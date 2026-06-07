@@ -76,14 +76,5 @@ def test_compiled_policy_trains() -> None:
 
 
 def test_compile_and_checkpoint_mutually_exclusive() -> None:
-    sim = GBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=5)
-    config = TrainConfig(n_iterations=1, batch_paths=8, compile_policy=True, checkpoint_steps=True)
     with pytest.raises(ValueError):
-        train(
-            sim,
-            FeedForwardPolicy(hidden_sizes=(4,)),
-            EuropeanCall(strike=100.0),
-            NoCost(),
-            CVaR(alpha=0.9),
-            config,
-        )
+        TrainConfig(n_iterations=1, batch_paths=8, compile_policy=True, checkpoint_steps=True)
