@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import torch
 
+from deephedging.market.cuda import CudaHestonSimulator
 from deephedging.market.heston import HestonSimulator
 from deephedging.market.noise import NoiseSpec
 from deephedging.market.state import MarketState
@@ -37,12 +38,14 @@ class HestonVarianceSwapSimulator:
     feature finite.
 
     Attributes:
-        heston: The single-asset Heston market being extended.
+        heston: The single-asset Heston market being extended; the
+            eager and the fused-kernel samplers are interchangeable
+            because both expose the clamped variance channel.
         vs_maturity: Variance swap maturity in years, strictly greater
             than the hedging horizon.
     """
 
-    heston: HestonSimulator
+    heston: HestonSimulator | CudaHestonSimulator
     vs_maturity: float
 
     def __post_init__(self) -> None:

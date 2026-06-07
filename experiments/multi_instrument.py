@@ -42,6 +42,7 @@ from deephedging import (
 )
 from deephedging.experiment import ExperimentRecord, append_record, load_records
 from deephedging.frictions.base import CostModel
+from deephedging.market import CudaHestonSimulator, kernels_available
 from deephedging.training.trainer import TrainResult
 
 MATURITY = 0.25
@@ -55,16 +56,31 @@ EVAL_SEED = 991
 PREMIUM_SEED = 7
 
 
-def make_heston(device: str) -> HestonSimulator:
+def make_heston(device: str, fused: bool) -> HestonSimulator | CudaHestonSimulator:
     """Builds the single-asset stochastic volatility market.
 
     Args:
         device: Device for path generation.
+        fused: Whether to sample with the fused CUDA kernel, which
+            generates two orders of magnitude faster but draws from its
+            own Philox streams, so runs are reproducible against fused
+            runs rather than against the eager stores.
 
     Returns:
         The Heston simulator underlying every arm.
     """
     v0, kappa, theta, xi, rho = HESTON_PARAMETERS
+    if fused:
+        return CudaHestonSimulator(
+            s0=100.0,
+            v0=v0,
+            kappa=kappa,
+            theta=theta,
+            xi=xi,
+            rho=rho,
+            maturity=MATURITY,
+            n_steps=N_STEPS,
+        )
     return HestonSimulator(
         s0=100.0,
         v0=v0,
@@ -95,7 +111,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--fused", action="store_true")
     arguments = parser.parse_args()
+    if arguments.fused and not kernels_available():
+        parser.error("--fused requires the CUDA kernel toolchain")
 
     iterations = 30 if arguments.smoke else 4000
     batch_paths = 1024 if arguments.smoke else 65_536
@@ -106,7 +125,7 @@ def main() -> None:
 
     results_path = RESULTS.replace(".jsonl", "_smoke.jsonl") if arguments.smoke else RESULTS
     completed = {record.name for record in load_records(results_path)}
-    heston = make_heston(arguments.device)
+    heston = make_heston(arguments.device, arguments.fused)
     two_asset = HestonVarianceSwapSimulator(heston=heston, vs_maturity=SWAP_MATURITY)
     call = EuropeanCall(strike=STRIKE)
     wrapped_call = SingleAssetPayoff(inner=call)
