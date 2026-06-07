@@ -16,11 +16,10 @@ effective sample workable at the highest aversion in the grid.
     uv run python experiments/objective_study.py [--smoke]
 """
 
-import argparse
-import gc
 import time
 
 import torch
+from _harness import open_store, parse_study_arguments, release_device
 
 from deephedging import (
     CVaR,
@@ -36,7 +35,7 @@ from deephedging import (
     pnl_summary,
     train,
 )
-from deephedging.experiment import ExperimentRecord, append_record, load_records
+from deephedging.experiment import ExperimentRecord, append_record
 from deephedging.risk.base import RiskMeasure
 
 SIGMA = 0.2
@@ -70,10 +69,7 @@ def make_objective(name: str) -> RiskMeasure:
 
 def main() -> None:
     """Runs the objective grid and prints the comparison table."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--smoke", action="store_true")
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    arguments = parser.parse_args()
+    arguments = parse_study_arguments()
 
     iterations = 30 if arguments.smoke else 3000
     batch_paths = 1024 if arguments.smoke else 65_536
@@ -85,8 +81,7 @@ def main() -> None:
         else ("cvar0.9", "cvar0.95", "cvar0.99", "entropic1.0", "entropic5.0", "entropic10.0")
     )
 
-    results_path = RESULTS.replace(".jsonl", "_smoke.jsonl") if arguments.smoke else RESULTS
-    completed = {record.name for record in load_records(results_path)}
+    results_path, completed = open_store(RESULTS, arguments.smoke)
     simulator = GBMSimulator(
         s0=100.0, sigma=SIGMA, maturity=MATURITY, n_steps=N_STEPS, device=arguments.device
     )
@@ -147,10 +142,7 @@ def main() -> None:
                 f"es99 {summary['es_99']:7.4f}  {duration:6.1f}s"
             )
             del policy, result
-            gc.collect()
-            if arguments.device == "cuda":
-                torch.cuda.synchronize()
-                torch.cuda.empty_cache()
+            release_device(arguments.device)
 
 
 if __name__ == "__main__":

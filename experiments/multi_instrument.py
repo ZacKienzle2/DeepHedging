@@ -15,11 +15,10 @@ full-provenance record so the table regenerates from the store alone.
     uv run python experiments/multi_instrument.py [--smoke]
 """
 
-import argparse
-import gc
 import time
 
 import torch
+from _harness import open_store, parse_study_arguments, release_device
 
 from deephedging import (
     CVaR,
@@ -40,9 +39,9 @@ from deephedging import (
     pnl_summary,
     train,
 )
-from deephedging.experiment import ExperimentRecord, append_record, load_records
+from deephedging.experiment import ExperimentRecord, append_record
 from deephedging.frictions.base import CostModel
-from deephedging.market import CudaHestonSimulator, kernels_available
+from deephedging.market import CudaHestonSimulator
 from deephedging.training.trainer import TrainResult
 
 MATURITY = 0.25
@@ -108,13 +107,7 @@ def cost_model(rate: float) -> CostModel:
 
 def main() -> None:
     """Runs the instrument-span grid and prints the comparison table."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--smoke", action="store_true")
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--fused", action="store_true")
-    arguments = parser.parse_args()
-    if arguments.fused and not kernels_available():
-        parser.error("--fused requires the CUDA kernel toolchain")
+    arguments = parse_study_arguments(fused_option=True)
 
     iterations = 30 if arguments.smoke else 4000
     batch_paths = 1024 if arguments.smoke else 65_536
@@ -123,8 +116,7 @@ def main() -> None:
     seeds = (1,) if arguments.smoke else (1, 2, 3, 4, 5)
     cost_rates = (0.0,) if arguments.smoke else (0.0, 1e-3)
 
-    results_path = RESULTS.replace(".jsonl", "_smoke.jsonl") if arguments.smoke else RESULTS
-    completed = {record.name for record in load_records(results_path)}
+    results_path, completed = open_store(RESULTS, arguments.smoke)
     heston = make_heston(arguments.device, arguments.fused)
     two_asset = HestonVarianceSwapSimulator(heston=heston, vs_maturity=SWAP_MATURITY)
     call = EuropeanCall(strike=STRIKE)
@@ -238,10 +230,7 @@ def main() -> None:
                     f"mean {summary['mean']:7.4f}  {duration:6.1f}s"
                 )
                 del policy, result
-                gc.collect()
-                if arguments.device == "cuda":
-                    torch.cuda.synchronize()
-                    torch.cuda.empty_cache()
+                release_device(arguments.device)
 
 
 if __name__ == "__main__":

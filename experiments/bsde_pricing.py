@@ -15,14 +15,14 @@ form, and the terminal-matching loss certificate.
     uv run python experiments/bsde_pricing.py [--smoke]
 """
 
-import argparse
 import math
 import time
 
 import torch
+from _harness import open_store, parse_study_arguments
 
 from deephedging.bsde import BSDEConfig, BSDEProblem, DeepBSDESolver, train_bsde
-from deephedging.experiment import ExperimentRecord, append_record, load_records
+from deephedging.experiment import ExperimentRecord, append_record
 
 DIMENSIONS = (1, 5, 20, 50)
 SIGMA = 0.2
@@ -73,18 +73,14 @@ def geometric_terminal(x: torch.Tensor) -> torch.Tensor:
 
 def main() -> None:
     """Runs the dimension sweep and prints the accuracy table."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--smoke", action="store_true")
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    arguments = parser.parse_args()
+    arguments = parse_study_arguments()
 
     iterations = 50 if arguments.smoke else 3000
     batch_paths = 256 if arguments.smoke else 1024
     seeds = (1,) if arguments.smoke else (1, 2, 3)
     dimensions = (1, 5) if arguments.smoke else DIMENSIONS
 
-    results_path = RESULTS.replace(".jsonl", "_smoke.jsonl") if arguments.smoke else RESULTS
-    completed = {record.name for record in load_records(results_path)}
+    results_path, completed = open_store(RESULTS, arguments.smoke)
     for dim in dimensions:
         reference = geometric_basket_reference(dim)
         hidden = (64, 64) if dim <= 5 else (128, 128)
