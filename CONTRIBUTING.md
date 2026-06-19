@@ -6,7 +6,7 @@
 2. One logical change per commit, following Conventional Commits 1.0.0.
 3. Open a pull request; reference the issue number so it auto-closes on merge.
 4. CI must pass and the PR must be reviewed before merge.
-5. Keep history linear: rebase feature branches on `main`; squash fixups with
+5. Keep history linear. Rebase feature branches on `main`, and squash fixups with
    `git rebase -i` before merge. Never rebase shared branches.
 
 ## Commit Messages
@@ -28,7 +28,7 @@
 ## Code Standards
 
 - Python: strict PEP 8, Google-style docstrings on public APIs, no inline
-  comments -- code should be self-evident.
+  comments, since code should be self-evident.
 - Tests accompany every behavioural change (`pytest`).
 - Profile before optimising; justify performance-motivated complexity.
 

@@ -7,7 +7,7 @@ beats the fitted continuation. The regression uses a quadratic
 polynomial basis, sufficient for the one-dimensional put. A binomial
 tree on the same dynamics serves as the converged reference the Monte
 Carlo estimate is pinned against, and the zero-rate degeneracy gives a
-second free golden: without interest on the strike an American put is
+second free golden. Without interest on the strike an American put is
 worth exactly its European twin.
 """
 

@@ -306,7 +306,7 @@ std::vector<torch::Tensor> heston_paths(
   return {spot, variance};
 }
 
-// The offset VALUE is trusted: it lives in device memory, so validating it
+// The offset VALUE is trusted. It lives in device memory, so validating it
 // host-side would force a synchronisation that capture forbids. Callers
 // write a non-negative shifted stream (stream << 32); a negative value
 // would wrap through the unsigned cast into a foreign Philox subsequence.

@@ -8,8 +8,8 @@ from deephedging.risk.base import RiskMeasure
 class MeanVariance(RiskMeasure):
     """Markowitz objective ``E[L] + c * Var(L)`` over the loss sample.
 
-    The classical mean-variance trade-off, included as the baseline against
-    which the coherent objectives are judged: it penalises dispersion
+    The classical mean-variance trade-off and the baseline against
+    which the coherent objectives are judged. It penalises dispersion
     symmetrically, so it charges for upside as well as downside and is not a
     coherent risk measure. The downside variant restricts the penalty to
     deviations above the mean, which is the relevant asymmetry for a hedger

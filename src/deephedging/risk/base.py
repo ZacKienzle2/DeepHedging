@@ -11,7 +11,7 @@ class RiskMeasure(nn.Module, ABC):
 
     Losses follow the convention that larger values are worse. Risk measures
     are ``nn.Module`` subclasses so that auxiliary variables (such as the
-    CVaR threshold) are registered parameters: they are optimised jointly
+    CVaR threshold) are registered parameters. They are optimised jointly
     with the policy and synchronised by DDP, where per-rank empirical
     statistics would silently disagree.
     """

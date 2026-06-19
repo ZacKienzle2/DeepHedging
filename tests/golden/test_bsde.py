@@ -1,6 +1,6 @@
 """Golden tests for the deep BSDE solver against closed forms.
 
-Tolerances are statistical: the solver is trained with small budgets so CI
+Tolerances are statistical. The solver is trained with small budgets so CI
 stays fast, and the references are exact Black-Scholes-type prices.
 """
 

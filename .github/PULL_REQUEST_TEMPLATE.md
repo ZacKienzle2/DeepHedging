@@ -23,6 +23,6 @@ Closes #
 
 ## Verification
 
-How the change was validated: tests, a study, or a benchmark. Paste the
+State how the change was validated with tests, a study, or a benchmark. Paste the
 acceptance evidence (numbers, not assertions) where a roadmap item moves
 to done.

@@ -4,7 +4,7 @@ At high confidence levels only the worst ``(1 - alpha)`` fraction of
 paths carries CVaR gradient, so batches must scale like the reciprocal
 tail mass. Tilting the Gaussian driver shifts sampling toward the
 loss-bearing region while per-path likelihood ratios keep every
-expectation unbiased under the original measure: for increments drawn
+expectation unbiased under the original measure. For increments drawn
 with mean ``tilt`` the ratio is ``exp(-tilt * sum(z) + n * tilt^2 / 2)``
 with ``z`` the tilted draws. The log ratio ships as the ``log_weight``
 state channel and the risk measures consume it; nothing about the

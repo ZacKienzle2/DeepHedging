@@ -5,7 +5,7 @@ learned hedging. The contract is path dependent, the volatility is
 stochastic, and no closed-form hedge ratio exists, so the practitioner
 baseline is the Black-Scholes vanilla delta at the long-run volatility,
 which neither sees the barrier nor stops trading after knockout. Two
-deep arms isolate where the improvement comes from: one observes only
+deep arms isolate where the improvement comes from. One observes only
 spot and time, the other adds the running maximum, the sufficient path
 statistic for the knockout. All arms receive the same Monte Carlo
 premium and score on common evaluation paths so comparisons are paired,

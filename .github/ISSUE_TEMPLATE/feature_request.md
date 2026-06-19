@@ -15,7 +15,7 @@ The interface and the algorithm. Reference the prior art where one exists.
 
 ## Acceptance criterion
 
-How a reviewer confirms it works: the test, study, or benchmark that
+How a reviewer confirms it works. The test, study, or benchmark that
 demonstrates the claim, with the reference it is measured against.
 
 ## Scope fence

@@ -3,7 +3,7 @@
 A result without the commit, library versions, device, and seeds that
 produced it cannot be reproduced or compared, so every record carries
 that provenance alongside the configuration and the outcome. Storage is
-one JSON object per line in an append-only file: diffable, greppable,
+one JSON object per line in an append-only file that is diffable, greppable,
 and free of any tracking framework, matching the repository's rule that
 frozen dataclasses plus plain files are the extension mechanism.
 """

@@ -13,7 +13,7 @@ class UpAndOutCall:
     otherwise. The barrier is monitored discretely on the rebalancing grid,
     so the payoff is the discretely-monitored contract; continuously
     monitored barriers knock out more often and are worth less. Monitoring
-    includes inception: a barrier at or below the initial spot makes the
+    includes inception. A barrier at or below the initial spot makes the
     contract worthless from the start, which the constructor cannot reject
     because the payoff never sees the spot.
 

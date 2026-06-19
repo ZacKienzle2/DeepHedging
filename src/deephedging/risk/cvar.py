@@ -13,7 +13,7 @@ class CVaR(RiskMeasure):
     ``w`` and the policy parameters equals minimising ``CVaR_alpha(L)``; the
     identity is pointwise in the policy and therefore survives nonconvex
     networks. The threshold is a registered parameter updated by SGD rather
-    than an empirical batch quantile: per-batch inner minimisation is
+    than an empirical batch quantile. Per-batch inner minimisation is
     optimistically biased (Jensen), and a parameter stays synchronised under
     DDP. Only roughly ``(1 - alpha) * batch`` paths carry gradient, so batch
     sizes should scale like ``1 / (1 - alpha)``.
