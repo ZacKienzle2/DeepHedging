@@ -65,6 +65,19 @@ markers = [
     "gpu: requires a CUDA device",
 ]
 
+[tool.coverage.run]
+source = ["deephedging"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+    "\\.\\.\\.",
+]
+
 [dependency-groups]
 dev = [
     "ninja>=1.13.0",
