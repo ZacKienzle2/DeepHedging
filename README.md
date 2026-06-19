@@ -44,14 +44,14 @@ consistent with the Whalley-Wilmott cube-root law; at higher tail
 aversion the fitted slope decreases, the expected direction once the
 objective weights rare deviations rather than local variance.
 
-Further studies in `experiments/`: a barrier option with no analytic
+Further studies in `experiments/` cover a barrier option with no analytic
 hedge where the deep policy cuts the delta baseline's tail by 20-26%, a
 tradable variance swap removing a further 11-12% of tail risk that the
 spot cannot span, parameter-matched architecture and risk-objective
 ablations, and deep BSDE pricing of a geometric basket call within 1.3%
 of its closed form up to fifty dimensions.
 
-Systems results, pinned by tests and benchmarks: fused CUDA Philox
+Systems results are pinned by tests and benchmarks. Fused CUDA Philox
 kernels reach several billion GBM paths per second and roughly two
 hundred times the eager Heston rate with bitwise replay; whole-episode
 graph capture collapses the dispatch-bound training iteration into one
@@ -117,7 +117,7 @@ uv run pytest -q -m gpu                      # kernel and capture parity
 ```
 
 Tests pin statistical relationships and closed-form references rather
-than bitwise values, plus design invariants: antithetic pairing measured
+than bitwise values, plus design invariants. Antithetic pairing measured
 harmful at convergence, additive control variates measured gradient-inert,
 and regenerated paths measured loss-identical to stored ones.
 

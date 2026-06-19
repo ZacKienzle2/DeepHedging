@@ -3,7 +3,7 @@
 Run from the repository root. Generation, pricing, and training rates
 share the paths-per-second unit but measure different work per path, so
 they are comparable only within a row across devices or backends, never
-across rows: a faster generator cannot lift the training rate beyond
+across rows. A faster generator cannot lift the training rate beyond
 generation's small share of the step. The pricing rows time the full
 estimate including payoff and reduction on both the fold and the grid
 route, so their ratio reflects the pricer a user calls rather than

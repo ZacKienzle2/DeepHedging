@@ -1,7 +1,7 @@
 """BSDE problem specification.
 
-Scope: semilinear parabolic PDEs whose generator ``f(t, x, y, z)`` is
-uniformly Lipschitz in ``(y, z)`` -- the Pardoux-Peng class where the
+The scope is semilinear parabolic PDEs whose generator ``f(t, x, y, z)``
+is uniformly Lipschitz in ``(y, z)``, the Pardoux-Peng class where the
 terminal-matching loss is a genuine a posteriori error certificate.
 Fully nonlinear problems (gamma constraints, uncertain volatility) and
 singular control (proportional transaction costs) need 2BSDE or reflected
@@ -62,7 +62,7 @@ class DiscountGenerator:
     """Linear discounting generator ``f = -r y``.
 
     With the forward drift set to the same rate (risk-neutral dynamics),
-    the solved ``Y_0`` is the discounted expectation: the no-friction
+    the solved ``Y_0`` is the discounted expectation, the no-friction
     arbitrage-free price.
 
     Attributes:

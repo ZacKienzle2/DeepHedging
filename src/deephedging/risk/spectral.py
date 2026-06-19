@@ -15,7 +15,7 @@ class SpectralRisk(RiskMeasure):
     non-decreasing spectrum and averages them. Writing it as a Choquet
     integral against a distortion ``g`` (a non-decreasing map with
     ``g(0) = 0`` and ``g(1) = 1``) makes the empirical estimator exact for
-    any spectrum: the weight on each order statistic is the distortion
+    any spectrum. The weight on each order statistic is the distortion
     increment across its probability mass, so no quadrature error enters and
     the indicator distortion reproduces CVaR to machine precision.
 

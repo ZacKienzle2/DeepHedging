@@ -2,7 +2,7 @@
 
 Compares a fresh benchmark result against a committed baseline and
 exits non-zero when any throughput falls more than the threshold below
-it. The baseline is a deliberate committed artefact: improvements
+it. The baseline is a deliberate committed artefact. Improvements
 ratchet the bar by updating it in review, and a baseline measured on
 one device is invalid on another, so the device strings must match.
 

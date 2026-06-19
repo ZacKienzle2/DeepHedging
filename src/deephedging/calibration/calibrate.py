@@ -127,7 +127,7 @@ def calibrate_heston(
 ) -> CalibrationResult:
     """Calibrates Heston parameters to a multi-maturity quote surface.
 
-    A single-maturity strip underdetermines the parameters: the smile
+    A single-maturity strip underdetermines the parameters. The smile
     constrains a blend of initial and long-run variance, so distinct
     parameter sets reprice one maturity almost exactly. The term
     structure is what separates ``v0`` from ``theta`` and pins the mean

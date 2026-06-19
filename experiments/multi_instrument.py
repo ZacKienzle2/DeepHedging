@@ -5,7 +5,7 @@ spot-only hedge, deep or analytic, leaves a tail driven by variance
 moves. Adding a variance swap as a second tradable closes the span, and
 the experiment measures how much tail risk the extra instrument
 removes. Three arms share one premium and one set of evaluation noise
-streams: the Black-Scholes delta hedge at the long-run volatility, a
+streams. They are the Black-Scholes delta hedge at the long-run volatility, a
 deep policy trading the spot alone, and a deep policy trading spot and
 swap jointly. The swap trades at its own price scale, so a proportional
 cost rate charges it almost nothing relative to the spot; cost

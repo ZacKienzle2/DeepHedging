@@ -102,7 +102,7 @@ def paired_bootstrap(
     """Paired bootstrap of ``metric(first) - metric(second)`` on common paths.
 
     The two samples must be aligned on the same paths, as common random
-    numbers produce: resampling one shared index set for both cancels the
+    numbers produce. Resampling one shared index set for both cancels the
     path noise they share and isolates the strategy difference, which is the
     comparison with the tightest interval and the correct one when the same
     market drives both. For a loss-like metric, where lower is better,

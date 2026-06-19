@@ -10,7 +10,7 @@ class Payoff(Protocol):
     """Maps full price paths to a terminal payoff per path.
 
     Payoffs are composable layers deliberately decoupled from path
-    generation: research iterates on instruments far faster than on
+    generation. Research iterates on instruments far faster than on
     simulators, and path-dependent payoffs need access to the whole path.
     """
 

@@ -22,7 +22,7 @@ class DeepBSDESolver(nn.Module):
     """Learned ``(Y_0, Z)`` pair for a fixed BSDE problem.
 
     The ``Z`` network consumes time normalised by the horizon, so the
-    input scale is invariant in the maturity: a raw calendar-time feature
+    input scale is invariant in the maturity. A raw calendar-time feature
     would dominate the ``log(x / x0)`` channel for long-dated problems and
     degrade conditioning. The generator still receives calendar time.
 
