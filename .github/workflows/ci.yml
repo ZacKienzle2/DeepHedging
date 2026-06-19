@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -23,6 +27,15 @@ jobs:
       - name: Type check
         run: uv run pyright
       - name: Fast tests
-        run: uv run pytest -q -m "not slow"
-      - name: Full tests
-        run: uv run pytest -q -m "slow"
+        run: uv run pytest -q -m "not slow and not gpu"
+      - name: Full tests with coverage
+        run: >-
+          uv run --with pytest-cov pytest -q -m "not gpu"
+          --cov=deephedging --cov-report=term-missing --cov-report=xml
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: ignore
