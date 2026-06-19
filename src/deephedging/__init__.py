@@ -44,10 +44,14 @@ from deephedging.features import (
 )
 from deephedging.frictions import CostModel, NoCost, PerAssetProportionalCost, ProportionalCost
 from deephedging.instruments import (
+    AsianCall,
+    AsianPut,
     BasketCall,
     EuropeanCall,
     EuropeanPut,
     GeometricBasketCall,
+    LookbackCall,
+    LookbackPut,
     Payoff,
     SingleAssetPayoff,
     UpAndOutCall,
@@ -82,6 +86,8 @@ from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, tra
 __version__ = "0.1.0"
 
 __all__ = [
+    "AsianCall",
+    "AsianPut",
     "BSDEConfig",
     "BSDEProblem",
     "BSDEResult",
@@ -107,6 +113,8 @@ __all__ = [
     "HestonSimulator",
     "HestonVarianceSwapSimulator",
     "LocalVolSimulator",
+    "LookbackCall",
+    "LookbackPut",
     "MarketState",
     "MeanVariance",
     "MertonSimulator",
