@@ -78,3 +78,41 @@ def test_compiled_policy_trains() -> None:
 def test_compile_and_checkpoint_mutually_exclusive() -> None:
     with pytest.raises(ValueError):
         TrainConfig(n_iterations=1, batch_paths=8, compile_policy=True, checkpoint_steps=True)
+
+
+def test_grad_clip_norm_rejects_nonpositive() -> None:
+    with pytest.raises(ValueError):
+        TrainConfig(n_iterations=1, batch_paths=8, grad_clip_norm=0.0)
+
+
+def test_lr_schedule_rejects_unknown_name() -> None:
+    with pytest.raises(ValueError):
+        TrainConfig(n_iterations=1, batch_paths=8, lr_schedule="exponential")
+
+
+@pytest.mark.slow
+def test_gradient_clipping_keeps_training_finite() -> None:
+    sigma, maturity, strike = 0.2, 0.25, 100.0
+    sim = GBMSimulator(s0=100.0, sigma=sigma, maturity=maturity, n_steps=5)
+    payoff = EuropeanCall(strike=strike)
+    config = TrainConfig(n_iterations=30, batch_paths=512, seed=8, grad_clip_norm=1.0)
+    torch.manual_seed(42)
+    policy = FeedForwardPolicy(hidden_sizes=(8,))
+    result = train(sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config)
+    assert len(result.losses) == config.n_iterations
+    assert all(abs(value) < 1e3 for value in result.losses)
+
+
+@pytest.mark.slow
+def test_cosine_schedule_improves_objective() -> None:
+    sigma, maturity, strike = 0.2, 0.25, 100.0
+    sim = GBMSimulator(s0=100.0, sigma=sigma, maturity=maturity, n_steps=10)
+    payoff = EuropeanCall(strike=strike)
+    premium = float(bs_call_price(100.0, strike, sigma, maturity))
+    config = TrainConfig(n_iterations=200, batch_paths=1024, lr=2e-3, seed=4, lr_schedule="cosine")
+    torch.manual_seed(21)
+    policy = FeedForwardPolicy(hidden_sizes=(16, 16))
+    result = train(sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config, premium=premium)
+    early = sum(result.losses[:20]) / 20
+    late = sum(result.losses[-20:]) / 20
+    assert late < early
