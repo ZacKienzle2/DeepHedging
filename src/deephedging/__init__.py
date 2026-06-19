@@ -70,7 +70,7 @@ from deephedging.pricing import (
     PriceEstimate,
     Pricer,
 )
-from deephedging.risk import CVaR, Entropic, RiskMeasure
+from deephedging.risk import CVaR, Entropic, MeanVariance, RiskMeasure, SpectralRisk
 from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, train
 
 __version__ = "0.1.0"
@@ -100,6 +100,7 @@ __all__ = [
     "HestonVarianceSwapSimulator",
     "LocalVolSimulator",
     "MarketState",
+    "MeanVariance",
     "MertonSimulator",
     "MonteCarloPricer",
     "MultiAssetFeatures",
@@ -118,6 +119,7 @@ __all__ = [
     "RunningMaxAccumulator",
     "RiskMeasure",
     "RunningMaxFeatures",
+    "SpectralRisk",
     "TiltedGBMSimulator",
     "TrainConfig",
     "UpAndOutCall",
