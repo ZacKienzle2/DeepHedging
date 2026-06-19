@@ -42,7 +42,14 @@ from deephedging.features import (
     RunningMaxFeatures,
     VarianceFeatures,
 )
-from deephedging.frictions import CostModel, NoCost, PerAssetProportionalCost, ProportionalCost
+from deephedging.frictions import (
+    BidAskCost,
+    CostModel,
+    NoCost,
+    PerAssetProportionalCost,
+    PowerLawImpactCost,
+    ProportionalCost,
+)
 from deephedging.instruments import (
     AsianCall,
     AsianPut,
@@ -93,6 +100,7 @@ __all__ = [
     "BSDEResult",
     "BarrierAliveAccumulator",
     "BasketCall",
+    "BidAskCost",
     "BlackScholesPricer",
     "BootstrapInterval",
     "CVaR",
@@ -128,6 +136,7 @@ __all__ = [
     "Payoff",
     "PathSimulator",
     "PerAssetProportionalCost",
+    "PowerLawImpactCost",
     "PriceEstimate",
     "Pricer",
     "ProportionalCost",
