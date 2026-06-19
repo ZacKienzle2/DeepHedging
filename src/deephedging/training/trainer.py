@@ -90,6 +90,21 @@ class TrainConfig:
             a single graph launch. Requires ``graph_episode``, a seed
             to address the streams, and a simulator exposing
             ``simulate_with_offset``.
+        grad_clip_norm: Optional ceiling on the global gradient norm across
+            the policy and risk parameters, applied between the backward and
+            the optimiser step. The tail objectives put almost all of their
+            gradient mass on the rare worst paths, so a single extreme batch
+            can produce a step that undoes many good ones; clipping bounds
+            that step without changing the well-behaved iterations. Applied
+            eagerly outside any captured region, so it composes with graph
+            capture. Default off preserves the unclipped behaviour.
+        lr_schedule: Optional learning-rate schedule, ``"cosine"`` or
+            ``"linear"``, decaying every parameter group proportionally over
+            ``n_iterations`` steps. A constant rate large enough to converge
+            quickly early tends to oscillate around the optimum late;
+            annealing keeps the early speed and settles the tail. The
+            schedule advances the optimiser's rates eagerly, so it is
+            compatible with episode capture, which records only the loss.
     """
 
     n_iterations: int = 2000
@@ -104,6 +119,8 @@ class TrainConfig:
     graph_episode: bool = False
     regenerate_paths: bool = False
     graph_generate: bool = False
+    grad_clip_norm: float | None = None
+    lr_schedule: str | None = None
 
     def __post_init__(self) -> None:
         if self.compile_policy and self.checkpoint_steps:
@@ -118,6 +135,10 @@ class TrainConfig:
             raise ValueError("graph_generate requires graph_episode")
         if self.graph_generate and self.seed is None:
             raise ValueError("graph_generate requires a seed to address the streams")
+        if self.grad_clip_norm is not None and self.grad_clip_norm <= 0.0:
+            raise ValueError(f"grad_clip_norm must be positive, got {self.grad_clip_norm}")
+        if self.lr_schedule is not None and self.lr_schedule not in ("cosine", "linear"):
+            raise ValueError(f"lr_schedule must be 'cosine' or 'linear', got {self.lr_schedule!r}")
 
 
 class _OffsetSimulator(Protocol):
@@ -299,6 +320,16 @@ def train(
         risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
         param_groups.append({"params": risk_params, "lr": risk_lr})
     optimizer = torch.optim.Adam(param_groups)
+    clip_params = list(policy.parameters()) + risk_params
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
+    if config.lr_schedule == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=max(1, config.n_iterations)
+        )
+    elif config.lr_schedule == "linear":
+        scheduler = torch.optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=1.0, end_factor=1e-3, total_iters=max(1, config.n_iterations)
+        )
     warmup_state = batch_state(0)
     with torch.no_grad():
         warmup_pnl = hedge_pnl(
@@ -403,7 +434,11 @@ def train(
             loss = episode_loss(batch_state(iteration + 1))
             optimizer.zero_grad(set_to_none=True)
         loss.backward()
+        if config.grad_clip_norm is not None:
+            torch.nn.utils.clip_grad_norm_(clip_params, config.grad_clip_norm)
         optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
         loss_history.append(loss.detach().clone())
     recorded = torch.stack(loss_history).cpu() if loss_history else torch.empty(0)
     return TrainResult(losses=recorded.tolist())
