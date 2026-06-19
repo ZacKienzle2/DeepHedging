@@ -20,6 +20,14 @@
 namespace {
 
 constexpr int kThreads = 256;
+constexpr int kMaxJumps = 16;
+
+// The truncated Poisson distribution function travels by value so the
+// offset kernels carry no device buffer that a captured graph would have
+// to keep alive across replays.
+struct JumpCdf {
+  float v[kMaxJumps + 1];
+};
 
 __device__ void gbm_path(
     float* __restrict__ spot,
@@ -244,6 +252,134 @@ __global__ void heston_fold_kernel(
   running_min[tid] = spot_min;
 }
 
+__device__ void merton_path(
+    float* __restrict__ spot,
+    float* __restrict__ jumps_out,
+    const int64_t n_paths,
+    const int n_steps,
+    const float s0,
+    const float drift,
+    const float diffusion,
+    const float jump_mean,
+    const float jump_vol,
+    const JumpCdf cdf,
+    const uint64_t seed,
+    const uint64_t subsequence_base,
+    const int64_t tid) {
+  curandStatePhilox4_32_10_t rng;
+  curand_init(seed, subsequence_base + static_cast<uint64_t>(tid), 0ULL, &rng);
+  float log_return = 0.0f;
+  float cumulative_jumps = 0.0f;
+  spot[tid] = s0;
+  jumps_out[tid] = 0.0f;
+  for (int k = 0; k < n_steps; ++k) {
+    const float z_diffusion = curand_normal(&rng);
+    const float uniform = curand_uniform(&rng);
+    const float z_jump = curand_normal(&rng);
+    int count = 0;
+    while (count < kMaxJumps && cdf.v[count] < uniform) {
+      ++count;
+    }
+    const float jumps = static_cast<float>(count);
+    const float jump_sum = jump_mean * jumps + jump_vol * sqrtf(jumps) * z_jump;
+    log_return += drift + diffusion * z_diffusion + jump_sum;
+    cumulative_jumps += jumps;
+    const int64_t row = static_cast<int64_t>(k + 1) * n_paths + tid;
+    spot[row] = s0 * expf(log_return);
+    jumps_out[row] = cumulative_jumps;
+  }
+}
+
+__global__ void merton_kernel(
+    float* __restrict__ spot,
+    float* __restrict__ jumps_out,
+    const int64_t n_paths,
+    const int n_steps,
+    const float s0,
+    const float drift,
+    const float diffusion,
+    const float jump_mean,
+    const float jump_vol,
+    const JumpCdf cdf,
+    const uint64_t seed,
+    const uint64_t subsequence_base) {
+  const int64_t tid =
+      static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (tid >= n_paths) {
+    return;
+  }
+  merton_path(spot, jumps_out, n_paths, n_steps, s0, drift, diffusion,
+              jump_mean, jump_vol, cdf, seed, subsequence_base, tid);
+}
+
+__global__ void merton_offset_kernel(
+    float* __restrict__ spot,
+    float* __restrict__ jumps_out,
+    const int64_t n_paths,
+    const int n_steps,
+    const float s0,
+    const float drift,
+    const float diffusion,
+    const float jump_mean,
+    const float jump_vol,
+    const JumpCdf cdf,
+    const uint64_t seed,
+    const int64_t* __restrict__ subsequence_base) {
+  const int64_t tid =
+      static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (tid >= n_paths) {
+    return;
+  }
+  merton_path(spot, jumps_out, n_paths, n_steps, s0, drift, diffusion,
+              jump_mean, jump_vol, cdf, seed,
+              static_cast<uint64_t>(*subsequence_base), tid);
+}
+
+__global__ void merton_fold_kernel(
+    float* __restrict__ terminal,
+    float* __restrict__ running_max,
+    float* __restrict__ running_min,
+    const int64_t n_paths,
+    const int n_steps,
+    const float s0,
+    const float drift,
+    const float diffusion,
+    const float jump_mean,
+    const float jump_vol,
+    const JumpCdf cdf,
+    const uint64_t seed,
+    const uint64_t subsequence_base) {
+  const int64_t tid =
+      static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (tid >= n_paths) {
+    return;
+  }
+  curandStatePhilox4_32_10_t rng;
+  curand_init(seed, subsequence_base + static_cast<uint64_t>(tid), 0ULL, &rng);
+  float log_return = 0.0f;
+  float spot = s0;
+  float spot_max = s0;
+  float spot_min = s0;
+  for (int k = 0; k < n_steps; ++k) {
+    const float z_diffusion = curand_normal(&rng);
+    const float uniform = curand_uniform(&rng);
+    const float z_jump = curand_normal(&rng);
+    int count = 0;
+    while (count < kMaxJumps && cdf.v[count] < uniform) {
+      ++count;
+    }
+    const float jumps = static_cast<float>(count);
+    const float jump_sum = jump_mean * jumps + jump_vol * sqrtf(jumps) * z_jump;
+    log_return += drift + diffusion * z_diffusion + jump_sum;
+    spot = s0 * expf(log_return);
+    spot_max = fmaxf(spot_max, spot);
+    spot_min = fminf(spot_min, spot);
+  }
+  terminal[tid] = spot;
+  running_max[tid] = spot_max;
+  running_min[tid] = spot_min;
+}
+
 int64_t blocks_for(const int64_t n_paths) {
   return (n_paths + kThreads - 1) / kThreads;
 }
@@ -414,6 +550,105 @@ std::vector<torch::Tensor> heston_folds(
   return {terminal, running_max, running_min};
 }
 
+JumpCdf make_jump_cdf(const double rate) {
+  JumpCdf cdf;
+  double pmf = std::exp(-rate);
+  double cumulative = pmf;
+  cdf.v[0] = static_cast<float>(cumulative);
+  for (int k = 1; k <= kMaxJumps; ++k) {
+    pmf *= rate / static_cast<double>(k);
+    cumulative += pmf;
+    cdf.v[k] = static_cast<float>(cumulative);
+  }
+  return cdf;
+}
+
+std::vector<torch::Tensor> merton_paths(
+    const int64_t n_paths, const int64_t n_steps, const double s0,
+    const double sigma, const double jump_intensity, const double jump_mean,
+    const double jump_vol, const double mu, const double maturity,
+    const int64_t seed, const int64_t stream) {
+  check_arguments(n_paths, n_steps, stream);
+  const auto options =
+      torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA);
+  auto spot = torch::empty({n_steps + 1, n_paths}, options);
+  auto jumps = torch::empty({n_steps + 1, n_paths}, options);
+  const double dt = maturity / static_cast<double>(n_steps);
+  const double mean_jump = std::exp(jump_mean + 0.5 * jump_vol * jump_vol) - 1.0;
+  const double compensator = jump_intensity * mean_jump;
+  const float drift =
+      static_cast<float>((mu - compensator - 0.5 * sigma * sigma) * dt);
+  const float diffusion = static_cast<float>(sigma * std::sqrt(dt));
+  const JumpCdf cdf = make_jump_cdf(jump_intensity * dt);
+  const uint64_t subsequence_base = static_cast<uint64_t>(stream) << 32;
+  merton_kernel<<<blocks_for(n_paths), kThreads, 0,
+                  at::cuda::getCurrentCUDAStream()>>>(
+      spot.data_ptr<float>(), jumps.data_ptr<float>(), n_paths,
+      static_cast<int>(n_steps), static_cast<float>(s0), drift, diffusion,
+      static_cast<float>(jump_mean), static_cast<float>(jump_vol), cdf,
+      static_cast<uint64_t>(seed), subsequence_base);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return {spot, jumps};
+}
+
+std::vector<torch::Tensor> merton_paths_offset(
+    const int64_t n_paths, const int64_t n_steps, const double s0,
+    const double sigma, const double jump_intensity, const double jump_mean,
+    const double jump_vol, const double mu, const double maturity,
+    const int64_t seed, const torch::Tensor& offset) {
+  check_arguments(n_paths, n_steps, 0);
+  check_offset(offset);
+  const auto options =
+      torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA);
+  auto spot = torch::empty({n_steps + 1, n_paths}, options);
+  auto jumps = torch::empty({n_steps + 1, n_paths}, options);
+  const double dt = maturity / static_cast<double>(n_steps);
+  const double mean_jump = std::exp(jump_mean + 0.5 * jump_vol * jump_vol) - 1.0;
+  const double compensator = jump_intensity * mean_jump;
+  const float drift =
+      static_cast<float>((mu - compensator - 0.5 * sigma * sigma) * dt);
+  const float diffusion = static_cast<float>(sigma * std::sqrt(dt));
+  const JumpCdf cdf = make_jump_cdf(jump_intensity * dt);
+  merton_offset_kernel<<<blocks_for(n_paths), kThreads, 0,
+                         at::cuda::getCurrentCUDAStream()>>>(
+      spot.data_ptr<float>(), jumps.data_ptr<float>(), n_paths,
+      static_cast<int>(n_steps), static_cast<float>(s0), drift, diffusion,
+      static_cast<float>(jump_mean), static_cast<float>(jump_vol), cdf,
+      static_cast<uint64_t>(seed), offset.data_ptr<int64_t>());
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return {spot, jumps};
+}
+
+std::vector<torch::Tensor> merton_folds(
+    const int64_t n_paths, const int64_t n_steps, const double s0,
+    const double sigma, const double jump_intensity, const double jump_mean,
+    const double jump_vol, const double mu, const double maturity,
+    const int64_t seed, const int64_t stream) {
+  check_arguments(n_paths, n_steps, stream);
+  const auto options =
+      torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA);
+  auto terminal = torch::empty({n_paths}, options);
+  auto running_max = torch::empty({n_paths}, options);
+  auto running_min = torch::empty({n_paths}, options);
+  const double dt = maturity / static_cast<double>(n_steps);
+  const double mean_jump = std::exp(jump_mean + 0.5 * jump_vol * jump_vol) - 1.0;
+  const double compensator = jump_intensity * mean_jump;
+  const float drift =
+      static_cast<float>((mu - compensator - 0.5 * sigma * sigma) * dt);
+  const float diffusion = static_cast<float>(sigma * std::sqrt(dt));
+  const JumpCdf cdf = make_jump_cdf(jump_intensity * dt);
+  const uint64_t subsequence_base = static_cast<uint64_t>(stream) << 32;
+  merton_fold_kernel<<<blocks_for(n_paths), kThreads, 0,
+                       at::cuda::getCurrentCUDAStream()>>>(
+      terminal.data_ptr<float>(), running_max.data_ptr<float>(),
+      running_min.data_ptr<float>(), n_paths, static_cast<int>(n_steps),
+      static_cast<float>(s0), drift, diffusion, static_cast<float>(jump_mean),
+      static_cast<float>(jump_vol), cdf, static_cast<uint64_t>(seed),
+      subsequence_base);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return {terminal, running_max, running_min};
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("gbm_paths", &gbm_paths, "Fused Philox GBM path generation");
   m.def("gbm_paths_offset", &gbm_paths_offset,
@@ -426,4 +661,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Fused Philox GBM path-statistic folds without the grid");
   m.def("heston_folds", &heston_folds,
         "Fused Philox Heston path-statistic folds without the grid");
+  m.def("merton_paths", &merton_paths,
+        "Fused Philox Merton jump-diffusion path generation");
+  m.def("merton_paths_offset", &merton_paths_offset,
+        "Fused Philox Merton paths reading the subsequence from device memory");
+  m.def("merton_folds", &merton_folds,
+        "Fused Philox Merton path-statistic folds without the grid");
 }

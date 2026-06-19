@@ -350,3 +350,146 @@ class CudaHestonSimulator:
             spec.stream,
         )
         return PathFolds(terminal=terminal, running_max=running_max, running_min=running_min)
+
+
+@dataclass(frozen=True)
+class CudaMertonSimulator:
+    """Fused-kernel Merton jump-diffusion sampler.
+
+    The kernel inverts a truncated Poisson distribution function against the
+    Philox uniform stream for the per-step jump count and draws the
+    conditional Gaussian jump sum in registers, so the compound-Poisson
+    component costs no extra launch. The cumulative jump count rides
+    alongside the spot grid as the ``jumps`` channel for jump-aware feature
+    maps.
+
+    Attributes:
+        s0: Initial spot price.
+        sigma: Diffusive volatility.
+        jump_intensity: Expected jumps per year.
+        jump_mean: Mean of the jump mark exponent.
+        jump_vol: Standard deviation of the jump mark exponent.
+        maturity: Horizon in years.
+        n_steps: Number of rebalancing intervals.
+        mu: Drift under the simulation measure.
+        device: Always a CUDA device.
+    """
+
+    s0: float
+    sigma: float
+    jump_intensity: float
+    jump_mean: float
+    jump_vol: float
+    maturity: float
+    n_steps: int
+    mu: float = 0.0
+    device: str = "cuda"
+
+    def __post_init__(self) -> None:
+        if self.s0 <= 0.0:
+            raise ValueError(f"s0 must be positive, got {self.s0}")
+        if self.sigma < 0.0:
+            raise ValueError(f"sigma must be non-negative, got {self.sigma}")
+        if self.jump_intensity < 0.0:
+            raise ValueError(f"jump_intensity must be non-negative, got {self.jump_intensity}")
+        if self.jump_vol < 0.0:
+            raise ValueError(f"jump_vol must be non-negative, got {self.jump_vol}")
+        if self.maturity <= 0.0:
+            raise ValueError(f"maturity must be positive, got {self.maturity}")
+        if self.n_steps < 1:
+            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+        if self.jump_intensity * self.maturity / self.n_steps > 2.0:
+            raise ValueError(
+                "jump_intensity per step exceeds the truncated sampler's range; increase n_steps"
+            )
+        if not str(self.device).startswith("cuda"):
+            raise ValueError(f"device must be a CUDA device, got {self.device}")
+
+    def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
+        """Simulates jump-diffusion market paths on the device.
+
+        Args:
+            n_paths: Number of independent paths.
+            noise: Optional addressable noise stream for exact replay.
+
+        Returns:
+            Market state with the cumulative ``jumps`` channel attached.
+        """
+        spec = _resolve_noise(noise)
+        spot, jumps = _kernels().merton_paths(
+            n_paths,
+            self.n_steps,
+            self.s0,
+            self.sigma,
+            self.jump_intensity,
+            self.jump_mean,
+            self.jump_vol,
+            self.mu,
+            self.maturity,
+            spec.seed,
+            spec.stream,
+        )
+        return MarketState(spot=spot, aux={"jumps": jumps})
+
+    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+        """Simulates Merton paths reading the stream offset from the device.
+
+        The kernel reads the shifted Philox subsequence from the offset
+        tensor at launch, so the call is capturable in a CUDA graph and
+        every replay draws the batch the offset names at replay time.
+        Writing ``stream << 32`` into the tensor reproduces :meth:`simulate`
+        with that stream bitwise.
+
+        Args:
+            n_paths: Number of independent paths.
+            seed: Philox seed shared with the offset's stream family.
+            offset: One-element int64 CUDA tensor holding the shifted
+                subsequence base.
+
+        Returns:
+            Market state with the cumulative ``jumps`` channel attached.
+        """
+        spot, jumps = _kernels().merton_paths_offset(
+            n_paths,
+            self.n_steps,
+            self.s0,
+            self.sigma,
+            self.jump_intensity,
+            self.jump_mean,
+            self.jump_vol,
+            self.mu,
+            self.maturity,
+            seed,
+            offset,
+        )
+        return MarketState(spot=spot, aux={"jumps": jumps})
+
+    def simulate_folds(self, n_paths: int, noise: NoiseSpec | None = None) -> PathFolds:
+        """Computes per-path statistics in registers, never the grid.
+
+        Consumes exactly the same Philox stream as :meth:`simulate`, so the
+        folds match the grid-derived statistics bitwise, which the parity
+        tests pin.
+
+        Args:
+            n_paths: Number of independent paths.
+            noise: Optional addressable noise stream for exact replay.
+
+        Returns:
+            Terminal, running maximum, and running minimum per path.
+        """
+        spec = _resolve_noise(noise)
+        terminal, running_max, running_min = _kernels().merton_folds(
+            n_paths,
+            self.n_steps,
+            self.s0,
+            self.sigma,
+            self.jump_intensity,
+            self.jump_mean,
+            self.jump_vol,
+            self.mu,
+            self.maturity,
+            spec.seed,
+            spec.stream,
+        )
+        return PathFolds(terminal=terminal, running_max=running_max, running_min=running_min)
