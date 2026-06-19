@@ -13,7 +13,9 @@ import torch
 from deephedging.market import (
     CudaGBMSimulator,
     CudaHestonSimulator,
+    CudaMertonSimulator,
     GBMSimulator,
+    MertonSimulator,
     NoiseSpec,
     kernels_available,
 )
@@ -31,6 +33,18 @@ def _cuda_gbm() -> CudaGBMSimulator:
 def _cuda_heston() -> CudaHestonSimulator:
     return CudaHestonSimulator(
         s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=1.0, n_steps=100
+    )
+
+
+def _cuda_merton() -> CudaMertonSimulator:
+    return CudaMertonSimulator(
+        s0=100.0,
+        sigma=0.2,
+        jump_intensity=1.0,
+        jump_mean=-0.1,
+        jump_vol=0.15,
+        maturity=1.0,
+        n_steps=50,
     )
 
 
@@ -116,6 +130,78 @@ def test_heston_folds_match_grid_bitwise() -> None:
     assert torch.equal(folds.terminal, state.terminal)
     assert torch.equal(folds.running_max, state.spot.max(dim=0).values)
     assert torch.equal(folds.running_min, state.spot.min(dim=0).values)
+
+
+def test_merton_shape_channels_and_replay() -> None:
+    sim = _cuda_merton()
+    state = sim.simulate(4096, noise=NoiseSpec(seed=29))
+    assert state.spot.shape == (51, 4096)
+    jumps = state.aux["jumps"]
+    assert jumps.shape == (51, 4096)
+    assert torch.all(jumps[0] == 0.0)
+    assert torch.all(jumps[-1] >= jumps[0])
+    replay = sim.simulate(4096, noise=NoiseSpec(seed=29))
+    assert torch.equal(state.spot, replay.spot)
+    assert torch.equal(jumps, replay.aux["jumps"])
+
+
+def test_merton_is_a_martingale_and_counts_jumps() -> None:
+    sim = _cuda_merton()
+    state = sim.simulate(400_000, noise=NoiseSpec(seed=31))
+    terminal = state.terminal
+    standard_error = float(terminal.std()) / math.sqrt(terminal.shape[0])
+    assert abs(float(terminal.mean()) - 100.0) < max(5.0 * standard_error, 0.3)
+    mean_jumps = float(state.aux["jumps"][-1].mean())
+    assert abs(mean_jumps - 1.0) < 0.05
+
+
+def test_merton_distribution_matches_eager() -> None:
+    cuda_state = _cuda_merton().simulate(400_000, noise=NoiseSpec(seed=37))
+    eager = MertonSimulator(
+        s0=100.0,
+        sigma=0.2,
+        jump_intensity=1.0,
+        jump_mean=-0.1,
+        jump_vol=0.15,
+        maturity=1.0,
+        n_steps=50,
+        device="cuda",
+    )
+    eager_state = eager.simulate(400_000, noise=NoiseSpec(seed=37))
+    cuda_log = torch.log(cuda_state.terminal / 100.0)
+    eager_log = torch.log(eager_state.terminal / 100.0)
+    assert abs(float(cuda_log.mean()) - float(eager_log.mean())) < 6e-3
+    assert abs(float(cuda_log.std()) - float(eager_log.std())) < 6e-3
+    cuda_jumps = float(cuda_state.aux["jumps"][-1].mean())
+    eager_jumps = float(eager_state.aux["jumps"][-1].mean())
+    assert abs(cuda_jumps - eager_jumps) < 0.02
+
+
+def test_merton_folds_match_grid_bitwise() -> None:
+    sim = _cuda_merton()
+    noise = NoiseSpec(seed=171)
+    state = sim.simulate(8192, noise=noise)
+    folds = sim.simulate_folds(8192, noise=noise)
+    assert torch.equal(folds.terminal, state.terminal)
+    assert torch.equal(folds.running_max, state.spot.max(dim=0).values)
+    assert torch.equal(folds.running_min, state.spot.min(dim=0).values)
+
+
+def test_merton_zero_intensity_degenerates_to_gbm() -> None:
+    sim = CudaMertonSimulator(
+        s0=100.0,
+        sigma=0.2,
+        jump_intensity=0.0,
+        jump_mean=0.0,
+        jump_vol=0.0,
+        maturity=1.0,
+        n_steps=50,
+    )
+    state = sim.simulate(400_000, noise=NoiseSpec(seed=41))
+    log_returns = torch.log(state.terminal / 100.0)
+    assert abs(float(log_returns.mean()) - (-0.5 * 0.2**2)) < 5e-3
+    assert abs(float(log_returns.std()) - 0.2) < 5e-3
+    assert float(state.aux["jumps"][-1].max()) == 0.0
 
 
 def test_pricer_fold_route_matches_grid_route() -> None:

@@ -5,6 +5,7 @@ from deephedging.market.correlated import CorrelatedGBMSimulator
 from deephedging.market.cuda import (
     CudaGBMSimulator,
     CudaHestonSimulator,
+    CudaMertonSimulator,
     kernels_available,
 )
 from deephedging.market.gbm import GBMSimulator
@@ -19,6 +20,7 @@ __all__ = [
     "CorrelatedGBMSimulator",
     "CudaGBMSimulator",
     "CudaHestonSimulator",
+    "CudaMertonSimulator",
     "GBMSimulator",
     "HestonSimulator",
     "HestonVarianceSwapSimulator",
