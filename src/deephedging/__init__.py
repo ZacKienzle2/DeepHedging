@@ -76,6 +76,7 @@ from deephedging.market import (
 )
 from deephedging.market.local_vol import LocalVolSimulator
 from deephedging.policies import (
+    DeepSetPolicy,
     FeedForwardPolicy,
     HedgePolicy,
     NoTransactionBandPolicy,
@@ -107,6 +108,7 @@ __all__ = [
     "CorrelatedGBMSimulator",
     "CostModel",
     "DeepBSDESolver",
+    "DeepSetPolicy",
     "DefaultFeatures",
     "DiscountGenerator",
     "Entropic",
