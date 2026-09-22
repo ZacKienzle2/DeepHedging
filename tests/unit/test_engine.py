@@ -85,7 +85,8 @@ def test_costs_strictly_reduce_pnl() -> None:
 
 
 def test_terminal_liquidation_charges_final_close() -> None:
-    state = _state()
+    sim = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=20, dtype=torch.float64)
+    state = sim.simulate(512, noise=NoiseSpec(seed=5))
     payoff = EuropeanCall(strike=100.0)
     cost = ProportionalCost(rate=1e-3)
     held = hedge_pnl(state, ConstantPolicy(0.5), payoff, cost)
