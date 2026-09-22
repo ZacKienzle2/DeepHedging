@@ -1,4 +1,11 @@
-"""Bootstrap confidence intervals and paired significance for PnL metrics."""
+"""Bootstrap confidence intervals and paired significance for PnL metrics.
+
+The resamples are drawn as one index matrix per chunk and the metric reduces
+its last dimension, so every resample in a chunk is evaluated by one call.
+This is the vectorised statistic contract of ``scipy.stats.bootstrap``,
+which replaces a Python loop issuing one gather and one metric per resample.
+Chunks bound the index matrix at ``_CHUNK_ELEMENTS`` entries.
+"""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -6,6 +13,8 @@ from dataclasses import dataclass
 import torch
 
 MetricFunction = Callable[[torch.Tensor], torch.Tensor]
+
+_CHUNK_ELEMENTS = 1 << 22
 
 
 @dataclass(frozen=True)
@@ -63,7 +72,9 @@ def bootstrap_metric(
 
     Args:
         pnl: PnL per path of shape ``(n_paths,)``.
-        metric: Map from a PnL sample to a scalar tensor.
+        metric: Reduces the last dimension of a PnL batch to one value per
+            leading index, as ``expected_shortfall`` and
+            ``lambda sample: sample.mean(dim=-1)`` do.
         n_resamples: Number of bootstrap resamples.
         confidence: Two-sided coverage in ``(0, 1)``.
         seed: Seed for the resampling generator, so the interval replays.
@@ -73,16 +84,12 @@ def bootstrap_metric(
 
     Raises:
         ValueError: If ``pnl`` is not one-dimensional, ``confidence`` is
-            outside ``(0, 1)``, or ``n_resamples`` is not positive.
+            outside ``(0, 1)``, ``n_resamples`` is not positive, or the
+            metric does not reduce the last dimension.
     """
     if (msg := _sample_error(pnl, confidence, n_resamples)) is not None:
         raise ValueError(msg)
-    n_paths = pnl.shape[0]
-    generator = torch.Generator(device=pnl.device).manual_seed(seed)
-    estimates = pnl.new_empty(n_resamples)
-    for index in range(n_resamples):
-        draw = torch.randint(n_paths, (n_paths,), generator=generator, device=pnl.device)
-        estimates[index] = metric(pnl[draw])
+    (estimates,) = _resampled(metric, (pnl,), n_resamples, seed)
     tail = (1.0 - confidence) / 2.0
     return BootstrapInterval(
         estimate=float(metric(pnl)),
@@ -113,7 +120,8 @@ def paired_bootstrap(
     Args:
         first_pnl: PnL per path of the first strategy, shape ``(n_paths,)``.
         second_pnl: PnL per path of the second strategy, same paths and shape.
-        metric: Map from a PnL sample to a scalar tensor.
+        metric: Reduces the last dimension of a PnL batch to one value per
+            leading index, as for :func:`bootstrap_metric`.
         n_resamples: Number of bootstrap resamples.
         confidence: Two-sided coverage in ``(0, 1)``.
         seed: Seed for the resampling generator.
@@ -123,8 +131,8 @@ def paired_bootstrap(
 
     Raises:
         ValueError: If the samples disagree in shape, are not one-dimensional,
-            ``confidence`` is outside ``(0, 1)``, or ``n_resamples`` is not
-            positive.
+            ``confidence`` is outside ``(0, 1)``, ``n_resamples`` is not
+            positive, or the metric does not reduce the last dimension.
     """
     if (msg := _sample_error(first_pnl, confidence, n_resamples)) is not None:
         raise ValueError(msg)
@@ -134,12 +142,8 @@ def paired_bootstrap(
             f"and {tuple(second_pnl.shape)}"
         )
         raise ValueError(msg)
-    n_paths = first_pnl.shape[0]
-    generator = torch.Generator(device=first_pnl.device).manual_seed(seed)
-    differences = first_pnl.new_empty(n_resamples)
-    for index in range(n_resamples):
-        draw = torch.randint(n_paths, (n_paths,), generator=generator, device=first_pnl.device)
-        differences[index] = metric(first_pnl[draw]) - metric(second_pnl[draw])
+    first, second = _resampled(metric, (first_pnl, second_pnl), n_resamples, seed)
+    differences = first - second
     tail = (1.0 - confidence) / 2.0
     return PairedComparison(
         difference=float(metric(first_pnl) - metric(second_pnl)),
@@ -148,6 +152,29 @@ def paired_bootstrap(
         confidence=confidence,
         probability_first_lower=float((differences < 0.0).double().mean()),
     )
+
+
+def _resampled(
+    metric: MetricFunction, samples: tuple[torch.Tensor, ...], n_resamples: int, seed: int
+) -> list[torch.Tensor]:
+    n_paths = samples[0].shape[0]
+    device = samples[0].device
+    generator = torch.Generator(device=device).manual_seed(seed)
+    rows = max(1, _CHUNK_ELEMENTS // n_paths)
+    chunks: list[list[torch.Tensor]] = [[] for _ in samples]
+    for start in range(0, n_resamples, rows):
+        count = min(rows, n_resamples - start)
+        draw = torch.randint(n_paths, (count, n_paths), generator=generator, device=device)
+        for chunk, sample in zip(chunks, samples, strict=True):
+            values = metric(sample[draw])
+            if values.shape != (count,):
+                msg = (
+                    f"metric must reduce the last dimension to shape ({count},), "
+                    f"got {tuple(values.shape)}"
+                )
+                raise ValueError(msg)
+            chunk.append(values)
+    return [torch.cat(chunk) for chunk in chunks]
 
 
 def _sample_error(pnl: torch.Tensor, confidence: float, n_resamples: int) -> str | None:
