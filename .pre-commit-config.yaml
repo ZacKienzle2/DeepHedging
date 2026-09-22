@@ -23,7 +23,11 @@ repos:
       - id: check-added-large-files
       - id: check-case-conflict
       - id: check-executables-have-shebangs
+      # With no stages of its own this also ran at commit-msg, where a linked
+      # worktree passes the message file by absolute path, and the colon after
+      # a Windows drive letter failed every commit made from one.
       - id: check-illegal-windows-names
+        stages: [pre-commit]
       - id: check-merge-conflict
       - id: check-shebang-scripts-are-executable
       - id: check-symlinks
@@ -275,8 +279,12 @@ repos:
   # Prose, which the guide does not cover. The hook entry is the bare vale
   # command, so it installs nothing the configuration names; the first entry
   # runs `vale sync` for that, which the packages documentation says to do
-  # before linting. --no-global reads this repository's configuration alone, so
-  # the hook reports the same thing here as on a runner.
+  # before linting. --config names this repository's .vale.ini, and vale reads
+  # that flag ahead of a VALE_CONFIG_PATH in the environment, which --no-global
+  # alone does not stop: a user-level path exported there replaced the
+  # repository's styles and failed files a runner passed. --no-global keeps
+  # the user-level file out as well, so the hook reports the same thing here
+  # as on a runner.
   - repo: https://github.com/errata-ai/vale
     rev: v3.20.0
     hooks:
@@ -287,10 +295,10 @@ repos:
       - id: vale
         alias: vale-sync
         name: vale sync
-        args: [sync]
+        args: [--config=.vale.ini, sync]
         pass_filenames: false
       - id: vale
-        args: [--no-global, --minAlertLevel=error, --output=line]
+        args: [--config=.vale.ini, --no-global, --minAlertLevel=error, --output=line]
         types_or: [markdown]
       # The commit message, at the stage git hands it over. .vale.ini reads
       # the message file as Markdown and layers ai-tells and ai-tells-commits
@@ -302,5 +310,5 @@ repos:
       - id: vale
         alias: vale-commit-message
         name: vale on the commit message
-        args: [--no-global, --minAlertLevel=error, --output=line]
+        args: [--config=.vale.ini, --no-global, --minAlertLevel=error, --output=line]
         stages: [commit-msg]
