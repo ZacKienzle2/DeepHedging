@@ -2,10 +2,12 @@
 # and is provided under the Creative Commons Zero public domain dedication.
 
 
+import torch
 from hypothesis import given
 from hypothesis import strategies as st
 
 import deephedging
+import deephedging.baselines
 import deephedging.market.rough_bergomi
 from deephedging import NoiseSpec, RoughBergomiSimulator
 
@@ -48,4 +50,21 @@ def test_fuzz_rough_bergomi_simulator_simulate(
 def test_fuzz_rough_bergomi_factor(hurst: float, rho: float, maturity: float, n_steps: int) -> None:
     deephedging.market.rough_bergomi.rough_bergomi_factor(
         hurst=hurst, rho=rho, maturity=maturity, n_steps=n_steps
+    )
+
+
+@given(hurst=_HURST, maturity=_MATURITY, n_steps=_STEPS, rho=_RHO)
+def test_equivalent_rough_bergomi_factor_per_maturity_rough_bergomi_factor(
+    hurst: float, maturity: float, n_steps: int, rho: float
+) -> None:
+    result_rough_bergomi_factor_per_maturity = (
+        deephedging.baselines.rough_bergomi_factor_per_maturity(
+            hurst=hurst, rho=rho, maturity=maturity, n_steps=n_steps
+        )
+    )
+    result_rough_bergomi_factor = deephedging.market.rough_bergomi.rough_bergomi_factor(
+        hurst=hurst, rho=rho, maturity=maturity, n_steps=n_steps
+    )
+    torch.testing.assert_close(
+        result_rough_bergomi_factor_per_maturity, result_rough_bergomi_factor
     )

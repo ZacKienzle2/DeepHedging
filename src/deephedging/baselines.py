@@ -223,3 +223,44 @@ def implied_vol_by_mpmath(
 
 def _price_gap(spot: float, strike: float, tau: float, price: float, sigma: Any) -> Any:
     return _call_by_mpmath(spot, strike, sigma, tau, 0.0, digits=60) - mpmath.mpf(price)
+
+
+def rough_bergomi_factor_per_maturity(
+    hurst: float, rho: float, maturity: float, n_steps: int
+) -> torch.Tensor:
+    """Builds the rough Bergomi factor from the covariance at the given maturity.
+
+    Evaluates the hypergeometric function for every pair of dates of this
+    maturity's grid and factors the covariance, the build that rescaling a
+    cached unit-maturity factor replaced.
+
+    Args:
+        hurst: Hurst exponent ``H`` in ``(0, 1/2)``.
+        rho: Correlation between the variance and price drivers.
+        maturity: Horizon in years.
+        n_steps: Number of grid dates.
+
+    Returns:
+        The float64 lower-triangular factor of shape ``(2 n_steps, 2 n_steps)``.
+    """
+    gamma = 0.5 - hurst
+    times = [maturity * (i + 1) / n_steps for i in range(n_steps)]
+    volterra = torch.empty(n_steps, n_steps, dtype=torch.float64)
+    for i, early in enumerate(times):
+        volterra[i, i] = early ** (2.0 * hurst)
+        for j in range(i + 1, n_steps):
+            ratio = times[j] / early
+            hypergeometric = mpmath.hyp2f1(1.0, gamma, 2.0 - gamma, 1.0 / ratio)
+            value = early ** (2.0 * hurst) * float(
+                2.0 * hurst * ratio**-gamma / (1.0 - gamma) * hypergeometric
+            )
+            volterra[i, j] = volterra[j, i] = value
+    grid = torch.tensor(times, dtype=torch.float64)
+    scale = rho * math.sqrt(2.0 * hurst) / (hurst + 0.5)
+    lag = (grid[:, None] - torch.minimum(grid[:, None], grid)).clamp(min=0.0)
+    cross = scale * (grid[:, None] ** (hurst + 0.5) - lag ** (hurst + 0.5))
+    driver = torch.minimum(grid[:, None], grid)
+    covariance = torch.cat(
+        (torch.cat((volterra, cross), dim=1), torch.cat((cross.T, driver), dim=1)), dim=0
+    )
+    return torch.linalg.cholesky(covariance)

@@ -18,7 +18,6 @@ def _volterra_ratio(hurst: float, x: float) -> float:
     )
 
 
-@cache
 def rough_bergomi_factor(hurst: float, rho: float, maturity: float, n_steps: int) -> torch.Tensor:
     """Cholesky factor of the joint law of the Volterra process and price driver.
 
@@ -28,7 +27,15 @@ def rough_bergomi_factor(hurst: float, rho: float, maturity: float, n_steps: int
     ``g = 1/2 - H`` (their eq. 4.1), ``E[W_v Z_u] = rho D_H (v^(H + 1/2) -
     (v - min(u, v))^(H + 1/2))`` with ``D_H = sqrt(2H) / (H + 1/2)``, and
     ``E[Z_v Z_u] = min(u, v)``. The hypergeometric function comes from
-    mpmath, and the factor is cached per configuration.
+    mpmath.
+
+    The covariance is self-similar in the maturity. On this grid the Volterra
+    block scales as ``maturity^(2H)``, the cross block as
+    ``maturity^(H + 1/2)`` and the driver block as ``maturity``, so the factor
+    is the unit-maturity factor with its first ``n_steps`` rows scaled by
+    ``maturity^H`` and the rest by ``maturity^(1/2)``. The unit factor holds
+    every hypergeometric evaluation and is cached per Hurst exponent,
+    correlation and grid, so one build serves every maturity.
 
     Args:
         hurst: Hurst exponent ``H`` in ``(0, 1/2)``.
@@ -41,7 +48,18 @@ def rough_bergomi_factor(hurst: float, rho: float, maturity: float, n_steps: int
         whose first ``n_steps`` rows produce the Volterra process and last
         ``n_steps`` rows the price driver at the grid dates.
     """
-    times = [maturity * (i + 1) / n_steps for i in range(n_steps)]
+    scale = torch.cat(
+        (
+            torch.full((n_steps,), maturity**hurst, dtype=torch.float64),
+            torch.full((n_steps,), math.sqrt(maturity), dtype=torch.float64),
+        )
+    )
+    return scale[:, None] * _unit_factor(hurst, rho, n_steps)
+
+
+@cache
+def _unit_factor(hurst: float, rho: float, n_steps: int) -> torch.Tensor:
+    times = [(i + 1) / n_steps for i in range(n_steps)]
     volterra = torch.empty(n_steps, n_steps, dtype=torch.float64)
     for i, early in enumerate(times):
         volterra[i, i] = early ** (2.0 * hurst)
