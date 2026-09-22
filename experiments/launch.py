@@ -15,8 +15,8 @@ import argparse
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from threading import Thread
 
 import torch
 
@@ -64,20 +64,9 @@ def main() -> None:
     for index, study in enumerate(STUDIES):
         queues[index % device_count].append(study)
 
-    results: dict[int, list[int]] = {}
-
-    def worker(device_index: int) -> None:
-        results[device_index] = run_queue(device_index, queues[device_index], arguments.smoke)
-
-    threads = [
-        Thread(target=worker, args=(index,)) for index in range(device_count) if queues[index]
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    failures = sum(code != 0 for codes in results.values() for code in codes)
+    with ThreadPoolExecutor(max_workers=device_count) as pool:
+        results = pool.map(run_queue, range(device_count), queues, [arguments.smoke] * device_count)
+        failures = sum(code != 0 for codes in results for code in codes)
     print(f"{len(STUDIES)} studies across {device_count} device(s), {failures} failure(s)")
     if failures:
         raise SystemExit(1)
