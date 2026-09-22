@@ -3,8 +3,8 @@
 from typing import override
 
 import torch
-from torch import nn
 
+from deephedging.networks import mlp
 from deephedging.policies.base import HedgePolicy
 
 _TOKEN_FEATURES = 3
@@ -55,19 +55,8 @@ class DeepSetPolicy(HedgePolicy):
             msg = f"n_assets must be at least 1, got {n_assets}"
             raise ValueError(msg)
         self.n_assets = n_assets
-        encoder_layers: list[nn.Module] = []
-        width = _TOKEN_FEATURES
-        for size in hidden_sizes:
-            encoder_layers.append(nn.Linear(width, size))
-            encoder_layers.append(nn.SiLU())
-            width = size
-        encoder_layers.append(nn.Linear(width, latent_size))
-        self.encoder = nn.Sequential(*encoder_layers)
-        self.head = nn.Sequential(
-            nn.Linear(2 * latent_size, latent_size),
-            nn.SiLU(),
-            nn.Linear(latent_size, 1),
-        )
+        self.encoder = mlp(_TOKEN_FEATURES, hidden_sizes, latent_size)
+        self.head = mlp(2 * latent_size, (latent_size,), 1)
 
     @override
     def forward(

@@ -23,6 +23,7 @@ from typing import cast, override
 import torch
 from torch import nn
 
+from deephedging.networks import mlp
 from deephedging.policies.base import HedgePolicy
 
 _HELD = 2
@@ -88,14 +89,7 @@ class NoTransactionBandPolicy(HedgePolicy):
         self.log_strike_ratio = math.log(strike_ratio)
         market = [column for column in range(n_features) if column != _HELD]
         self.register_buffer("market_columns", torch.tensor(market), persistent=False)
-        layers: list[nn.Module] = []
-        width = len(market)
-        for size in hidden_sizes:
-            layers.append(nn.Linear(width, size))
-            layers.append(nn.SiLU())
-            width = size
-        layers.append(nn.Linear(width, 2))
-        self.net = nn.Sequential(*layers)
+        self.net = mlp(len(market), hidden_sizes, 2)
 
     def bands(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Computes the band edges from the market columns.

@@ -26,6 +26,7 @@ from torch import nn
 
 from deephedging.bsde.problem import BSDEProblem
 from deephedging.market.noise import NoiseSpec
+from deephedging.networks import mlp
 
 
 class BackwardPair(nn.Module):
@@ -48,14 +49,7 @@ class BackwardPair(nn.Module):
             hidden_sizes: Widths of the hidden layers.
         """
         super().__init__()
-        layers: list[nn.Module] = []
-        width = dim
-        for size in hidden_sizes:
-            layers.append(nn.Linear(width, size))
-            layers.append(nn.SiLU())
-            width = size
-        layers.append(nn.Linear(width, 1 + dim))
-        self.net = nn.Sequential(*layers)
+        self.net = mlp(dim, hidden_sizes, 1 + dim)
 
     def forward(self, log_x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Evaluates the value and volatility heads.
@@ -162,9 +156,11 @@ def solve_backward(problem: BSDEProblem, config: BackwardConfig) -> BackwardResu
             value, z = network(log_x)
             step_time = torch.tensor(time, device=config.device)
             estimate = (
-                value - problem.generator(step_time, x, value, z) * dt + (z * increment).sum(dim=-1)
+                value
+                - problem.generator(step_time, x, value, z) * dt
+                + torch.linalg.vecdot(z, increment)
             )
-            loss = torch.mean((target - estimate) ** 2)
+            loss = nn.functional.mse_loss(estimate, target)
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()

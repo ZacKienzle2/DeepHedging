@@ -22,6 +22,7 @@ from torch import nn
 
 from deephedging.bsde.problem import BSDEProblem
 from deephedging.market.noise import NoiseSpec
+from deephedging.networks import mlp
 
 
 class DeepBSDESolver(nn.Module):
@@ -47,14 +48,7 @@ class DeepBSDESolver(nn.Module):
         super().__init__()
         self.dim = dim
         self.y0 = nn.Parameter(torch.zeros(()))
-        layers: list[nn.Module] = []
-        width = dim + 1
-        for size in hidden_sizes:
-            layers.append(nn.Linear(width, size))
-            layers.append(nn.SiLU())
-            width = size
-        layers.append(nn.Linear(width, dim))
-        self.z_net = nn.Sequential(*layers)
+        self.z_net = mlp(dim + 1, hidden_sizes, dim)
 
     def forward(
         self, problem: BSDEProblem, n_paths: int, noise: NoiseSpec | None = None
@@ -87,7 +81,7 @@ class DeepBSDESolver(nn.Module):
         x = problem.x0 * torch.exp(log_x)
         scaled_times = (times / problem.maturity).view(-1, 1, 1).expand(-1, n_paths, 1)
         z = self.z_net(torch.cat((scaled_times, log_x), dim=-1))
-        martingale = (z * dw).sum(dim=-1)
+        martingale = torch.linalg.vecdot(z, dw)
         y = self.y0.expand(n_paths)
         for k in range(problem.n_steps):
             y = y - problem.generator(times[k], x[k], y, z[k]) * dt + martingale[k]
@@ -177,7 +171,7 @@ def train_bsde(
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
         y_terminal, target = solver(problem, config.batch_paths, noise=batch_noise(iteration + 1))
-        loss = torch.mean((y_terminal - target) ** 2)
+        loss = nn.functional.mse_loss(y_terminal, target)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
