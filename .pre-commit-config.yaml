@@ -103,7 +103,7 @@ repos:
       - id: sp-repo-review
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.6
+    rev: v0.16.7
     hooks:
       - id: ruff-check
         args: ["--fix", "--show-fixes"]
@@ -125,7 +125,7 @@ repos:
   # uv's own hook refuses a commit whose uv.lock no longer matches
   # pyproject.toml, so the lock file the CI jobs sync from is never stale.
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.12.11
+    rev: 0.12.15
     hooks:
       - id: uv-lock
 
@@ -202,7 +202,7 @@ repos:
   # open issues for it (rhysd/actionlint#711, #732) have no maintainer reply,
   # so `./` stays until actionlint accepts `$/` and this threshold goes.
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.30.0
+    rev: v1.30.1
     hooks:
       - id: zizmor
         args: ["--min-severity=medium"]
@@ -226,12 +226,12 @@ repos:
   # shfmt reads .editorconfig for its indent and style when given no flags,
   # so the shell scripts follow the same file every other language does.
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.13.1-1
+    rev: v3.14.1-1
     hooks:
       - id: shfmt
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1-1
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
 
@@ -251,7 +251,7 @@ repos:
   # An immutable tag is the point of pinning, so the version stays exact and
   # Dependabot's pre-commit ecosystem moves it.
   - repo: https://github.com/crate-ci/typos
-    rev: v1.50.1
+    rev: v1.50.2
     hooks:
       - id: typos
         args: ["--force-exclude"]
@@ -286,7 +286,7 @@ repos:
   # the user-level file out as well, so the hook reports the same thing here
   # as on a runner.
   - repo: https://github.com/errata-ai/vale
-    rev: v3.20.0
+    rev: v3.21.0
     hooks:
       # vale's own pre-commit recipe: sync runs whenever the hooks run, so the
       # styles .vale.ini names are present on a runner that checks only the
