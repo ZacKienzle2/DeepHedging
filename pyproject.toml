@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Deep hedging research framework: neural hedging policies under market frictions"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["torch>=2.2,<3"]
+dependencies = ["mpmath>=1.3", "torch>=2.2,<3"]
 
 [project.optional-dependencies]
 notebook = ["matplotlib>=3.8", "ipykernel>=6.29,<10"]

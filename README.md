@@ -76,7 +76,8 @@ src/deephedging/
 |-- training/     Episode engine, training loop, graph capture,
 |                 regenerative backward
 |-- calibration/  Heston characteristic function, COS pricing, surface fit
-|-- evaluation/   Closed forms, American exercise, baselines, metrics
+|-- evaluation/   Closed forms through the normalised Black function,
+|                 American exercise, baselines, metrics
 |-- bsde/         Deep BSDE solver for semilinear pricing PDEs
 |-- pricing.py    Closed-form and Monte Carlo pricers
 `-- experiment.py Append-only provenance records

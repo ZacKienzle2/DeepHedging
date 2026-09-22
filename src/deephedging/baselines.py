@@ -4,12 +4,15 @@ WORKFLOW.md keeps the obvious version of a function when it is rewritten, and
 ``nox -s generate -- deephedging.baselines.<old> deephedging.<module>.<new>``
 writes the Hypothesis test that compares the two over generated inputs. Each
 function here is the version its replacement's commit measured against, with
-the loop that the rewrite removed. None of them is exported or used at run time.
+the loop that the rewrite removed. Where the replaced version was itself wrong,
+its oracle is the defining formula in 400-digit mpmath arithmetic instead,
+which no cancellation reaches. None of them is exported or used at run time.
 """
 
 import math
-from typing import cast
+from typing import Any, cast
 
+import mpmath
 import torch
 from torch.utils.checkpoint import checkpoint
 
@@ -151,3 +154,33 @@ def bootstrap_metric_per_resample(
         high=float(torch.quantile(estimates, 1.0 - tail)),
         confidence=confidence,
     )
+
+
+def _call_by_mpmath(spot: Any, strike: Any, sigma: Any, tau: Any, rate: Any, digits: int) -> Any:
+    with mpmath.workdps(digits):
+        s, k, v, t, r = (mpmath.mpf(value) for value in (spot, strike, sigma, tau, rate))
+        d1 = (mpmath.log(s / k) + (r + v**2 / 2) * t) / (v * mpmath.sqrt(t))
+        d2 = d1 - v * mpmath.sqrt(t)
+        return s * mpmath.ncdf(d1) - k * mpmath.exp(-r * t) * mpmath.ncdf(d2)
+
+
+def bs_call_price_by_mpmath(
+    spot: float, strike: float, sigma: float, tau: float, rate: float = 0.0
+) -> torch.Tensor:
+    """Prices a call by ``S N(d1) - K exp(-r tau) N(d2)`` in 400 digits.
+
+    Four hundred digits leave the subtraction exact for every price down to
+    the float64 underflow threshold.
+
+    Args:
+        spot: Spot price.
+        strike: Strike price.
+        sigma: Volatility.
+        tau: Time to maturity.
+        rate: Continuously compounded interest rate.
+
+    Returns:
+        Scalar float64 call price, correctly rounded from the exact value.
+    """
+    value = _call_by_mpmath(spot, strike, sigma, tau, rate, digits=400)
+    return torch.tensor(float(value), dtype=torch.float64)
