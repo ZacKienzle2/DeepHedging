@@ -81,7 +81,8 @@ src/deephedging/
 `-- experiment.py Append-only provenance records
 csrc/             Fused Philox path kernels (CUDA)
 experiments/      Seven studies with committed result stores
-tests/            Unit suite, golden tests, design invariants, benchmarks
+tests/            Unit suite, golden tests, design invariants, benchmarks,
+                  ghostwritten equivalence and fuzz tests
 docs/             Roadmap
 Main.ipynb        End-to-end walkthrough
 ```
@@ -118,6 +119,7 @@ nox                                  # lint, tests, typing
 nox -s bench                         # pytest-benchmark throughput suite
 nox -s fast                          # tests a change affects, by testmon
 nox -s mutants -- <module>           # cosmic-ray mutation testing
+nox -s generate -- <old> <new>       # ghostwritten equivalence test
 uv run pytest -m gpu                 # kernel and capture parity
 ```
 

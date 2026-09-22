@@ -112,7 +112,7 @@ PC140 = "mypy runs as a local hook through uv, where torch resolves, and pyright
 [tool.pytest]
 minversion = "9"
 strict = true
-addopts = ["-ra"]
+addopts = ["-ra", "--import-mode=importlib"]
 filterwarnings = [
   "error",
   "ignore:_get_vc_env is private:UserWarning",
