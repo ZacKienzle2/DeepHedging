@@ -114,12 +114,18 @@ def test_fused_generation(benchmark: BenchmarkFixture, model: str) -> None:
 
 @pytest.mark.gpu
 @fused
-def test_generated_training(benchmark: BenchmarkFixture) -> None:
+@pytest.mark.parametrize("precision", ["fp32", "tf32", "bf16"])
+def test_generated_training(
+    benchmark: BenchmarkFixture, monkeypatch: pytest.MonkeyPatch, precision: str
+) -> None:
+    if precision == "tf32":
+        monkeypatch.setattr(torch.backends.cuda.matmul, "fp32_precision", "tf32")
     simulator = CudaHestonSimulator(**_HESTON, maturity=0.25, n_steps=_STEPS)
     config = TrainConfig(
         n_iterations=200,
         batch_paths=_PATHS["cuda"],
         seed=1,
+        amp=precision == "bf16",
         graph_episode=True,
         graph_generate=True,
     )

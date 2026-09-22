@@ -44,7 +44,9 @@ def _positions(
     held: list[torch.Tensor] = []
     for t in range(n_steps):
         features = features_of(state, t, taus[t], position)
-        with torch.autocast(device_type=device_type, dtype=torch.bfloat16, enabled=amp):
+        with torch.autocast(
+            device_type=device_type, dtype=torch.bfloat16, enabled=amp, cache_enabled=False
+        ):
             if use_checkpoint:
                 output = checkpoint(policy, features, hidden, use_reentrant=False)
                 new_position, hidden = cast("tuple[torch.Tensor, torch.Tensor | None]", output)
@@ -95,10 +97,12 @@ def hedge_pnl(
             are cast back so the PnL state, the cost accounting, and the
             risk reduction stay in the path dtype, where systematic
             rounding bias would otherwise survive Monte Carlo averaging.
-            Pays off only for networks wide enough to engage tensor
-            cores; at the 64-wide default the per-step cast overhead
-            exceeds the matmul saving and the benchmark runs faster
-            with this off.
+            The casts are extra kernels, so an eager loop that is already
+            bound by kernel launches gains little; under whole-iteration
+            capture the launches are free and the halved activation
+            traffic cut the 64-wide generated training benchmark by a
+            third. Each autocast region spans one date, so its weight
+            cast cache is disabled, which is also what capture requires.
 
     Returns:
         PnL per path of shape ``(n_paths,)``; positive is profit.

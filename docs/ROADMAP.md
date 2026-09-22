@@ -35,9 +35,10 @@ The framework already covers the full deep-hedging loop end to end.
 - The instruments are a European call and put, arithmetic and geometric basket
   calls, an up-and-out barrier call, and a single-asset adapter.
 - The frictions are proportional and per-asset proportional costs.
-- The training systems provide whole-episode CUDA graph capture, in-graph batch
-  generation, a noise-regenerative backward, gradient checkpointing, and
-  bfloat16 autocast, all addressable from one config.
+- The training systems provide whole-iteration CUDA graph capture with a
+  capturable fused Adam step, in-graph batch generation, a noise-regenerative
+  backward, gradient checkpointing, and bfloat16 autocast that composes with
+  capture, all addressable from one config.
 - The pricing and PDE layer holds closed-form Black-Scholes and Merton
   references, a Cox-Ross-Rubinstein tree and Longstaff-Schwartz Monte Carlo for
   the American put, a Monte Carlo pricer with fold fast paths, and a deep BSDE

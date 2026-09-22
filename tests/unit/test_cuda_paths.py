@@ -302,3 +302,21 @@ def test_graphed_episode_matches_eager_training() -> None:
     for eager_value, graphed_value in zip(eager_losses, graphed_losses, strict=True):
         assert abs(eager_value - graphed_value) < 5e-2 * max(1.0, abs(eager_value))
     assert graphed_losses[-1] < graphed_losses[0]
+
+
+def test_graphed_autocast_matches_eager_autocast() -> None:
+    sim = CudaGBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=10)
+
+    def run(graphed: bool) -> list[float]:
+        torch.manual_seed(37)
+        policy = FeedForwardPolicy(hidden_sizes=(64, 64)).to("cuda")
+        config = TrainConfig(
+            n_iterations=20, batch_paths=4096, seed=8, amp=True, graph_episode=graphed
+        )
+        return train(
+            sim, policy, EuropeanCall(strike=100.0), ProportionalCost(rate=1e-3), CVaR(0.9), config
+        ).losses
+
+    eager, graphed = run(graphed=False), run(graphed=True)
+    assert abs(eager[0] - graphed[0]) < 1e-5 * max(1.0, abs(eager[0]))
+    assert all(abs(a - b) < 5e-2 * max(1.0, abs(a)) for a, b in zip(eager, graphed, strict=True))

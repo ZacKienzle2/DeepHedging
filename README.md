@@ -53,10 +53,12 @@ dimensions.
 
 Systems results are pinned by tests and benchmarks. Fused CUDA Philox kernels
 reach several billion GBM paths per second and roughly two hundred times the
-eager Heston rate with bitwise replay; whole-episode graph capture collapses the
-dispatch-bound training iteration into one launch; the noise-regenerative
-backward cuts peak training memory 12.7x at a quarter-million paths and lifts
-the feasible batch from a quarter million to beyond two million paths on a
+eager Heston rate with bitwise replay; whole-iteration graph capture, with the
+backward and a capturable fused Adam step inside the graph, collapses the
+dispatch-bound training iteration into one replay, and bfloat16 autocast under
+capture cuts that iteration by a further third; the noise-regenerative backward
+cuts peak training memory 12.7x at a quarter-million paths and lifts the
+feasible batch from a quarter million to beyond two million paths on a
 sixteen-gigabyte device.
 
 ## Layout
