@@ -73,11 +73,8 @@ class LocalVolSimulator:
             device=self.device,
             generator=generator,
         )
-        rows = (
-            torch.stack([self.surface.vol_row(k * dt) for k in range(self.n_steps)])
-            .to(self.dtype)
-            .to(self.device)
-        )
+        times = torch.arange(self.n_steps, dtype=torch.float64) * dt
+        rows = self.surface.vol_rows(times).to(self.dtype).to(self.device)
         log_return = torch.zeros((n_paths,), dtype=self.dtype, device=self.device)
         out = torch.empty((self.n_steps + 1, n_paths), dtype=self.dtype, device=self.device)
         out[0] = 0.0
@@ -90,7 +87,7 @@ class LocalVolSimulator:
             )
             left = strikes[index - 1]
             weight = (clamped - left) / (strikes[index] - left)
-            vol = (1.0 - weight) * row[index - 1] + weight * row[index]
+            vol = torch.lerp(row[index - 1], row[index], weight)
             log_return = log_return + (self.mu - 0.5 * vol**2) * dt + vol * sqrt_dt * z[k]
             out[k + 1] = log_return
         return MarketState(spot=out.exp_().mul_(self.s0))

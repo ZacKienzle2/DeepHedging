@@ -5,14 +5,14 @@ maturity derivative over the strike convexity, ``2 dC/dT / (K^2 d2C/dK2)``
 under a zero rate. Both derivatives come from finite differences on a
 dense grid priced by the COS engine, so the construction consumes the
 calibrated model directly and no market interpolation sits between
-calibration and simulation. The maturity derivative uses the exact
-three-point formula for non-uniform spacing because the symmetric
-central difference loses an order when the gaps differ; the strike
-convexity is the standard second-order stencil on the uniform strike
-grid. The variance is clamped to a wide admissible band because finite
-differences near the wings divide one small number by another, and an
-unguarded ratio there turns a tiny butterfly violation into an absurd
-volatility.
+calibration and simulation. The maturity derivative is ``torch.gradient``
+with the maturities as coordinates, which uses the exact three-point formula
+for non-uniform spacing, since the symmetric central difference loses an order
+when the gaps differ; the strike convexity is the second difference
+``torch.diff(n=2)`` over the uniform strike step squared. The variance is
+clamped to a wide admissible band because finite differences near the wings
+divide one small number by another, and an unguarded ratio there turns a tiny
+butterfly violation into an absurd volatility.
 """
 
 from dataclasses import dataclass
@@ -40,27 +40,21 @@ class LocalVolSurface:
     strikes: torch.Tensor
     vols: torch.Tensor
 
-    def vol_row(self, tau: float) -> torch.Tensor:
-        """Interpolates the volatility row at a calendar time.
+    def vol_rows(self, times: torch.Tensor) -> torch.Tensor:
+        """Interpolates the volatility rows at calendar times, linearly in time.
 
         Args:
-            tau: Calendar time in years, clamped to the grid range.
+            times: Calendar times in years of shape ``(n_times,)`` in float64,
+                clamped to the grid range.
 
         Returns:
-            Volatilities over the strike grid, shape ``(n_strikes,)``.
+            Volatilities over the strike grid, shape ``(n_times, n_strikes)``.
         """
-        position = float(
-            torch.clamp(
-                torch.searchsorted(self.taus, torch.tensor(tau, dtype=torch.float64)),
-                min=1,
-                max=self.taus.shape[0] - 1,
-            )
-        )
-        upper = int(position)
+        upper = torch.searchsorted(self.taus, times).clamp(min=1, max=self.taus.shape[0] - 1)
         lower = upper - 1
-        span = float(self.taus[upper] - self.taus[lower])
-        weight = min(max((tau - float(self.taus[lower])) / span, 0.0), 1.0)
-        return (1.0 - weight) * self.vols[lower] + weight * self.vols[upper]
+        span = self.taus[upper] - self.taus[lower]
+        weight = ((times - self.taus[lower]) / span).clamp(min=0.0, max=1.0)
+        return torch.lerp(self.vols[lower], self.vols[upper], weight.unsqueeze(-1))
 
 
 def dupire_surface(
@@ -102,20 +96,8 @@ def dupire_surface(
     tensors = params.as_tensors()
     prices = torch.stack([price_surface(tensors, s0, strikes, float(tau)) for tau in taus])
 
-    time_derivative = torch.empty_like(prices)
-    time_derivative[0] = (prices[1] - prices[0]) / float(taus[1] - taus[0])
-    time_derivative[-1] = (prices[-1] - prices[-2]) / float(taus[-1] - taus[-2])
-    backward_span = (taus[1:-1] - taus[:-2]).unsqueeze(1)
-    forward_span = (taus[2:] - taus[1:-1]).unsqueeze(1)
-    total_span = backward_span + forward_span
-    time_derivative[1:-1] = (
-        -forward_span / (backward_span * total_span) * prices[:-2]
-        + (forward_span - backward_span) / (backward_span * forward_span) * prices[1:-1]
-        + backward_span / (forward_span * total_span) * prices[2:]
-    )
-
-    convexity = (prices[:, 2:] - 2.0 * prices[:, 1:-1] + prices[:, :-2]) / strike_step**2
-    convexity = torch.clamp(convexity, min=1e-7)
+    (time_derivative,) = torch.gradient(prices, spacing=(taus,), dim=0)
+    convexity = torch.clamp(torch.diff(prices, n=2, dim=1) / strike_step**2, min=1e-7)
     inner_strikes = strikes[1:-1]
     local_variance = 2.0 * time_derivative[:, 1:-1] / (inner_strikes**2 * convexity)
     local_variance = torch.clamp(local_variance, min=_MIN_VARIANCE, max=_MAX_VARIANCE)

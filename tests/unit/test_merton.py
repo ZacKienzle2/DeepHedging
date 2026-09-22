@@ -115,7 +115,8 @@ def test_invalid_parameters_raise() -> None:
         _simulator(jump_intensity=-1.0)
     with pytest.raises(ValueError, match="jump_vol must be non-negative"):
         _simulator(jump_vol=-0.1)
-    with pytest.raises(
-        ValueError, match="jump_intensity per step exceeds the truncated sampler's range"
-    ):
-        _simulator(jump_intensity=200.0, n_steps=10)
+
+
+def test_many_jumps_per_step_keep_the_poisson_mean() -> None:
+    state = _simulator(jump_intensity=200.0, n_steps=10).simulate(4096, noise=NoiseSpec(seed=3))
+    assert abs(float(state.aux["jumps"][-1].mean()) - 200.0) < 2.0
