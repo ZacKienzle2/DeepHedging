@@ -12,6 +12,7 @@ from deephedging.market.gbm import GBMSimulator
 from deephedging.market.heston import HestonSimulator
 from deephedging.market.merton import MertonSimulator
 from deephedging.market.noise import NoiseSpec
+from deephedging.market.rough_bergomi import RoughBergomiSimulator
 from deephedging.market.state import MarketState, PathFolds
 from deephedging.market.tilted import TiltedGBMSimulator
 from deephedging.market.variance_swap import HestonVarianceSwapSimulator
@@ -29,6 +30,7 @@ __all__ = [
     "NoiseSpec",
     "PathFolds",
     "PathSimulator",
+    "RoughBergomiSimulator",
     "TiltedGBMSimulator",
     "kernels_available",
 ]

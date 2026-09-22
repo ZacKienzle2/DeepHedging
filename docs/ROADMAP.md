@@ -143,8 +143,10 @@ face.
   characteristic-function price.
 - `[planned]` Bates model, which adds Merton jumps to Heston dynamics.
 - `[planned]` SABR with an arbitrage-aware sampling scheme.
-- `[research]` Rough volatility (rough Heston, rough Bergomi) through a hybrid
-  scheme for the fractional kernel.
+- `[done]` Rough Bergomi sampled exactly on the rebalancing grid through the
+  Cholesky factor of Bayer, Friz and Gatheral (2016).
+- `[research]` Rough Heston, and the hybrid scheme for the fractional kernel on
+  grids too fine for the Cholesky factor.
 - `[research]` Local-stochastic volatility coupling a calibrated local surface
   to a stochastic variance driver.
 - `[research]` Pure-jump Levy models (variance gamma, CGMY) and regime-switching

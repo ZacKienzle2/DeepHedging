@@ -72,6 +72,7 @@ from deephedging.market import (
     MertonSimulator,
     NoiseSpec,
     PathSimulator,
+    RoughBergomiSimulator,
     TiltedGBMSimulator,
 )
 from deephedging.market.local_vol import LocalVolSimulator
@@ -144,6 +145,7 @@ __all__ = [
     "ProportionalCost",
     "RecurrentPolicy",
     "RiskMeasure",
+    "RoughBergomiSimulator",
     "RunningMaxAccumulator",
     "RunningMaxFeatures",
     "SingleAssetPayoff",
