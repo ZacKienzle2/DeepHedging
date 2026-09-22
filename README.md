@@ -81,7 +81,8 @@ src/deephedging/
 |                 Let's Be Rational implied volatility
 |-- evaluation/   Closed forms through the normalised Black function,
 |                 American exercise, baselines, metrics
-|-- bsde/         Deep BSDE solver for semilinear pricing PDEs
+|-- bsde/         Deep BSDE solver and the deep backward scheme, reflected
+|                 for American claims
 |-- pricing.py    Closed-form and Monte Carlo pricers
 `-- experiment.py Append-only provenance records
 csrc/             Fused Philox path kernels (CUDA)

@@ -200,7 +200,8 @@ Turn the pricing and calibration corners into first-class subsystems.
   barrier problems as a noise-free cross-check on Monte Carlo.
 - `[planned]` Put pricing and general European payoffs in the COS pricer,
   extended off the zero-rate assumption.
-- `[research]` Reflected BSDE for optimal stopping and American pricing.
+- `[done]` The deep backward scheme of Hure, Pham and Warin (2020), with its
+  reflected variant for optimal stopping and American pricing.
 - `[research]` Fully nonlinear and second-order BSDE for HJB problems, uncertain
   volatility, and gamma constraints, the scope the current semilinear solver
   fences out.
