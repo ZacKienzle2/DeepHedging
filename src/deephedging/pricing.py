@@ -157,6 +157,9 @@ class MonteCarloPricer:
             state = simulator.simulate(self.n_paths, noise=NoiseSpec(seed=self.seed))
             values = payoff(state.spot)
         discount = math.exp(-self.rate * simulator.maturity)
-        mean = float(values.mean()) * discount
-        spread = float(values.std()) / math.sqrt(self.n_paths) * discount
-        return PriceEstimate(value=mean, standard_error=spread, provenance="monte-carlo")
+        std, mean = torch.std_mean(values)
+        return PriceEstimate(
+            value=float(mean) * discount,
+            standard_error=float(std) / math.sqrt(self.n_paths) * discount,
+            provenance="monte-carlo",
+        )
