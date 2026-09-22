@@ -17,7 +17,7 @@ _SQRT_2PI = math.sqrt(2.0 * math.pi)
 
 
 def _d1(
-    spot: torch.Tensor, strike: Market, sigma: Market, tau: torch.Tensor, rate: float
+    spot: torch.Tensor, strike: Market, sigma: Market, tau: torch.Tensor, rate: Market
 ) -> torch.Tensor:
     if isinstance(sigma, float) and sigma <= 0.0:
         msg = f"sigma must be positive, got {sigma}"
@@ -33,7 +33,7 @@ def bs_call_price(
     strike: Market,
     sigma: Market,
     tau: Market,
-    rate: float = 0.0,
+    rate: Market = 0.0,
 ) -> torch.Tensor:
     """Black-Scholes price of a European call.
 
@@ -42,7 +42,7 @@ def bs_call_price(
         strike: Strike price; scalar or tensor.
         sigma: Volatility; scalar or tensor.
         tau: Time to maturity; scalar or tensor broadcastable with ``spot``.
-        rate: Continuously compounded interest rate.
+        rate: Continuously compounded interest rate; scalar or tensor.
 
     Returns:
         Call price with the broadcast shape of the inputs.
