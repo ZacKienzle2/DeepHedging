@@ -135,6 +135,7 @@ def solve_backward(problem: BSDEProblem, config: BackwardConfig) -> BackwardResu
             network.parameters(), lr=config.lr, fused=config.device.startswith("cuda")
         )
         time = date * dt
+        step_time = torch.full((), time, device=config.device)
         steps = config.first_iterations if following is None else config.iterations
         loss = torch.zeros(())
         for step in range(steps):
@@ -154,7 +155,6 @@ def solve_backward(problem: BSDEProblem, config: BackwardConfig) -> BackwardResu
                     value, _ = following(log_next)
                     target = torch.maximum(value, target) if config.american else value
             value, z = network(log_x)
-            step_time = torch.tensor(time, device=config.device)
             estimate = (
                 value
                 - problem.generator(step_time, x, value, z) * dt
