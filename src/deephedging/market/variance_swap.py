@@ -118,14 +118,15 @@ class HestonVarianceSwapSimulator:
     def _extend(self, state: MarketState) -> MarketState:
         variance = state.aux["variance"]
         dt = self.heston.maturity / self.heston.n_steps
-        accrued = variance.new_zeros(variance.shape)
-        accrued[1:] = torch.cumsum(0.5 * dt * (variance[:-1] + variance[1:]), dim=0)
+        accrued = torch.nn.functional.pad(
+            torch.cumulative_trapezoid(variance, dx=dt, dim=0), (0, 0, 1, 0)
+        )
         kappa = self.heston.kappa
         theta = self.heston.theta
         remaining = self.vs_maturity - dt * torch.arange(
             self.heston.n_steps + 1, dtype=variance.dtype, device=variance.device
         ).unsqueeze(1)
-        decay = (1.0 - torch.exp(-kappa * remaining)) / kappa
+        decay = -torch.expm1(-kappa * remaining) / kappa
         swap = (accrued + (variance - theta) * decay + theta * remaining) / self.vs_maturity
         return MarketState(
             spot=torch.stack((state.spot, swap), dim=-1),
@@ -140,5 +141,5 @@ class HestonVarianceSwapSimulator:
         """
         kappa = self.heston.kappa
         theta = self.heston.theta
-        decay = (1.0 - math.exp(-kappa * self.vs_maturity)) / kappa
+        decay = -math.expm1(-kappa * self.vs_maturity) / kappa
         return ((self.heston.v0 - theta) * decay + theta * self.vs_maturity) / self.vs_maturity
