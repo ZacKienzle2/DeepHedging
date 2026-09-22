@@ -10,6 +10,16 @@ import math
 import pytest
 import torch
 
+from deephedging import (
+    CVaR,
+    EuropeanCall,
+    FeedForwardPolicy,
+    ProportionalCost,
+    TrainConfig,
+    VarianceFeatures,
+    train,
+)
+from deephedging.instruments import UpAndOutCall
 from deephedging.market import (
     CudaGBMSimulator,
     CudaHestonSimulator,
@@ -19,6 +29,7 @@ from deephedging.market import (
     NoiseSpec,
     kernels_available,
 )
+from deephedging.pricing import MonteCarloPricer
 
 pytestmark = [
     pytest.mark.gpu,
@@ -205,8 +216,6 @@ def test_merton_zero_intensity_degenerates_to_gbm() -> None:
 
 
 def test_pricer_fold_route_matches_grid_route() -> None:
-    from deephedging.instruments import EuropeanCall, UpAndOutCall
-    from deephedging.pricing import MonteCarloPricer
 
     sim = _cuda_gbm()
     pricer = MonteCarloPricer(n_paths=100_000, seed=173)
@@ -220,19 +229,11 @@ def test_pricer_fold_route_matches_grid_route() -> None:
 
 def test_stream_bounds_enforced() -> None:
     sim = _cuda_gbm()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"stream must lie in \[0, 2\^32\)"):
         sim.simulate(16, noise=NoiseSpec(seed=1, stream=1 << 32))
 
 
 def test_graphed_episode_matches_eager_training() -> None:
-    from deephedging import (
-        CVaR,
-        EuropeanCall,
-        FeedForwardPolicy,
-        ProportionalCost,
-        TrainConfig,
-        train,
-    )
 
     sim = CudaGBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=10)
     payoff = EuropeanCall(strike=100.0)
@@ -270,8 +271,6 @@ def test_graphed_episode_matches_eager_training() -> None:
     first_checkpointed = run_checkpointed()
     assert abs(first_graphed - first_checkpointed) < 1e-5 * max(1.0, abs(first_graphed))
 
-    from deephedging import VarianceFeatures
-
     heston = CudaHestonSimulator(
         s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=0.25, n_steps=10
     )
@@ -303,3 +302,21 @@ def test_graphed_episode_matches_eager_training() -> None:
     for eager_value, graphed_value in zip(eager_losses, graphed_losses, strict=True):
         assert abs(eager_value - graphed_value) < 5e-2 * max(1.0, abs(eager_value))
     assert graphed_losses[-1] < graphed_losses[0]
+
+
+def test_graphed_autocast_matches_eager_autocast() -> None:
+    sim = CudaGBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=10)
+
+    def run(graphed: bool) -> list[float]:
+        torch.manual_seed(37)
+        policy = FeedForwardPolicy(hidden_sizes=(64, 64)).to("cuda")
+        config = TrainConfig(
+            n_iterations=20, batch_paths=4096, seed=8, amp=True, graph_episode=graphed
+        )
+        return train(
+            sim, policy, EuropeanCall(strike=100.0), ProportionalCost(rate=1e-3), CVaR(0.9), config
+        ).losses
+
+    eager, graphed = run(graphed=False), run(graphed=True)
+    assert abs(eager[0] - graphed[0]) < 1e-5 * max(1.0, abs(eager[0]))
+    assert all(abs(a - b) < 5e-2 * max(1.0, abs(a)) for a, b in zip(eager, graphed, strict=True))

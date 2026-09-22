@@ -15,10 +15,17 @@ import torch
 from deephedging.features import VarianceFeatures
 from deephedging.frictions import ProportionalCost
 from deephedging.instruments import EuropeanCall
-from deephedging.market import GBMSimulator, HestonSimulator, TiltedGBMSimulator
+from deephedging.market import (
+    CudaGBMSimulator,
+    GBMSimulator,
+    HestonSimulator,
+    NoiseSpec,
+    TiltedGBMSimulator,
+    kernels_available,
+)
 from deephedging.policies import FeedForwardPolicy
 from deephedging.risk import CVaR
-from deephedging.training import TrainConfig, train
+from deephedging.training import TrainConfig, hedge_pnl, train
 
 _SIGMA = 0.2
 _MATURITY = 30 / 365
@@ -112,7 +119,6 @@ def test_regeneration_reproduces_aux_channels() -> None:
 
 @pytest.mark.gpu
 def test_regeneration_matches_on_the_cuda_backend() -> None:
-    from deephedging.market import CudaGBMSimulator, kernels_available
 
     if not kernels_available():
         pytest.skip("CUDA kernel toolchain unavailable")
@@ -138,7 +144,6 @@ def test_regeneration_matches_on_the_cuda_backend() -> None:
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_regeneration_cuts_peak_memory_at_scale() -> None:
-    from deephedging.market import CudaGBMSimulator, kernels_available
 
     if not kernels_available():
         pytest.skip("CUDA kernel toolchain unavailable")
@@ -183,8 +188,6 @@ def test_evaluation_never_routes_through_regeneration() -> None:
         CVaR(alpha=0.9),
         config,
     )
-    from deephedging.market import NoiseSpec
-    from deephedging.training import hedge_pnl
 
     state = sim.simulate(1024, noise=NoiseSpec(seed=99))
     with torch.no_grad():

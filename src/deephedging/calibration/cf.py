@@ -65,13 +65,17 @@ def cos_call_price(
             interval is degenerate.
     """
     if n_terms < 2:
-        raise ValueError(f"n_terms must be at least 2, got {n_terms}")
+        msg = f"n_terms must be at least 2, got {n_terms}"
+        raise ValueError(msg)
     if s0 <= 0.0:
-        raise ValueError(f"s0 must be positive, got {s0}")
+        msg = f"s0 must be positive, got {s0}"
+        raise ValueError(msg)
     if bool((strikes <= 0.0).any()):
-        raise ValueError("strikes must be positive everywhere")
+        msg = "strikes must be positive everywhere"
+        raise ValueError(msg)
     if not b > a:
-        raise ValueError(f"truncation interval must satisfy b > a, got [{a}, {b}]")
+        msg = f"truncation interval must satisfy b > a, got [{a}, {b}]"
+        raise ValueError(msg)
     k = torch.arange(n_terms, dtype=torch.float64)
     omega = k * math.pi / (b - a)
     payoff_coefficients = (2.0 / (b - a)) * (_chi(omega, a, b) - _psi(omega, a, b))

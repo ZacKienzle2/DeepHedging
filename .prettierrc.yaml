@@ -1,0 +1,13 @@
+proseWrap: always
+printWidth: 80
+overrides:
+  - files: ["*.yml", "*.yaml", ".clang-*", "*.cff"]
+    options:
+      printWidth: 120
+  # The VS Code files are serialised by Jinja's tojson with an indent of 2,
+  # which prints as JSON.stringify does. prettier's json-stringify parser keeps
+  # that whitespace, where the json parser folds a short array onto one line
+  # and copier update then conflicts on the folded lines.
+  - files: [".vscode/*.json"]
+    options:
+      parser: json-stringify

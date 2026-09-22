@@ -32,10 +32,13 @@ class PowerLawImpactCost:
     exponent: float = 1.5
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.coefficient < 0.0:
-            raise ValueError(f"coefficient must be non-negative, got {self.coefficient}")
+            msg = f"coefficient must be non-negative, got {self.coefficient}"
+            raise ValueError(msg)
         if self.exponent < 1.0:
-            raise ValueError(f"exponent must be at least one, got {self.exponent}")
+            msg = f"exponent must be at least one, got {self.exponent}"
+            raise ValueError(msg)
 
     def __call__(self, trade: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
         """Computes the market-impact cost of a trade.

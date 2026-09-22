@@ -10,7 +10,6 @@ compiled on first use; the eager simulators remain the reference oracle
 and the fallback wherever no toolchain or device exists.
 """
 
-import glob
 import os
 import shutil
 import warnings
@@ -30,23 +29,10 @@ _MAX_STREAM = 1 << 32
 def _ensure_msvc_on_path() -> None:
     if os.name != "nt" or shutil.which("cl") is not None:
         return
-    program_files = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
-    pattern = os.path.join(
-        program_files,
-        "Microsoft Visual Studio",
-        "*",
-        "*",
-        "VC",
-        "Tools",
-        "MSVC",
-        "*",
-        "bin",
-        "Hostx64",
-        "x64",
-    )
-    candidates = sorted(glob.glob(pattern))
+    studio = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
+    candidates = sorted(studio.glob("Microsoft Visual Studio/*/*/VC/Tools/MSVC/*/bin/Hostx64/x64"))
     if candidates:
-        os.environ["PATH"] = candidates[-1] + os.pathsep + os.environ["PATH"]
+        os.environ["PATH"] = f"{candidates[-1]}{os.pathsep}{os.environ['PATH']}"
 
 
 @cache
@@ -94,7 +80,8 @@ def _resolve_noise(noise: NoiseSpec | None) -> NoiseSpec:
     if noise is None:
         return NoiseSpec(seed=int(torch.randint(0, 2**62, ()).item()))
     if not 0 <= noise.stream < _MAX_STREAM:
-        raise ValueError(f"stream must lie in [0, 2^32), got {noise.stream}")
+        msg = f"stream must lie in [0, 2^32), got {noise.stream}"
+        raise ValueError(msg)
     return noise
 
 
@@ -119,16 +106,22 @@ class CudaGBMSimulator:
     device: str = "cuda"
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.s0 <= 0.0:
-            raise ValueError(f"s0 must be positive, got {self.s0}")
+            msg = f"s0 must be positive, got {self.s0}"
+            raise ValueError(msg)
         if self.sigma < 0.0:
-            raise ValueError(f"sigma must be non-negative, got {self.sigma}")
+            msg = f"sigma must be non-negative, got {self.sigma}"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)
         if not str(self.device).startswith("cuda"):
-            raise ValueError(f"device must be a CUDA device, got {self.device}")
+            msg = f"device must be a CUDA device, got {self.device}"
+            raise ValueError(msg)
 
     def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
         """Simulates GBM market paths on the device.
@@ -240,24 +233,34 @@ class CudaHestonSimulator:
     device: str = "cuda"
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.s0 <= 0.0:
-            raise ValueError(f"s0 must be positive, got {self.s0}")
+            msg = f"s0 must be positive, got {self.s0}"
+            raise ValueError(msg)
         if self.v0 < 0.0:
-            raise ValueError(f"v0 must be non-negative, got {self.v0}")
+            msg = f"v0 must be non-negative, got {self.v0}"
+            raise ValueError(msg)
         if self.kappa <= 0.0:
-            raise ValueError(f"kappa must be positive, got {self.kappa}")
+            msg = f"kappa must be positive, got {self.kappa}"
+            raise ValueError(msg)
         if self.theta < 0.0:
-            raise ValueError(f"theta must be non-negative, got {self.theta}")
+            msg = f"theta must be non-negative, got {self.theta}"
+            raise ValueError(msg)
         if self.xi < 0.0:
-            raise ValueError(f"xi must be non-negative, got {self.xi}")
+            msg = f"xi must be non-negative, got {self.xi}"
+            raise ValueError(msg)
         if not -1.0 <= self.rho <= 1.0:
-            raise ValueError(f"rho must be in [-1, 1], got {self.rho}")
+            msg = f"rho must be in [-1, 1], got {self.rho}"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)
         if not str(self.device).startswith("cuda"):
-            raise ValueError(f"device must be a CUDA device, got {self.device}")
+            msg = f"device must be a CUDA device, got {self.device}"
+            raise ValueError(msg)
 
     def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
         """Simulates Heston market paths on the device.
@@ -386,24 +389,31 @@ class CudaMertonSimulator:
     device: str = "cuda"
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.s0 <= 0.0:
-            raise ValueError(f"s0 must be positive, got {self.s0}")
+            msg = f"s0 must be positive, got {self.s0}"
+            raise ValueError(msg)
         if self.sigma < 0.0:
-            raise ValueError(f"sigma must be non-negative, got {self.sigma}")
+            msg = f"sigma must be non-negative, got {self.sigma}"
+            raise ValueError(msg)
         if self.jump_intensity < 0.0:
-            raise ValueError(f"jump_intensity must be non-negative, got {self.jump_intensity}")
+            msg = f"jump_intensity must be non-negative, got {self.jump_intensity}"
+            raise ValueError(msg)
         if self.jump_vol < 0.0:
-            raise ValueError(f"jump_vol must be non-negative, got {self.jump_vol}")
+            msg = f"jump_vol must be non-negative, got {self.jump_vol}"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)
         if self.jump_intensity * self.maturity / self.n_steps > 2.0:
-            raise ValueError(
-                "jump_intensity per step exceeds the truncated sampler's range; increase n_steps"
-            )
+            msg = "jump_intensity per step exceeds the truncated sampler's range; increase n_steps"
+            raise ValueError(msg)
         if not str(self.device).startswith("cuda"):
-            raise ValueError(f"device must be a CUDA device, got {self.device}")
+            msg = f"device must be a CUDA device, got {self.device}"
+            raise ValueError(msg)
 
     def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
         """Simulates jump-diffusion market paths on the device.

@@ -1,15 +1,20 @@
 """Tests for the correlated multi-asset simulator and basket payoffs."""
 
 import math
+from typing import override
 
 import pytest
 import torch
 
-from deephedging.frictions import ProportionalCost
+from deephedging import CVaR, MultiAssetFeatures, TrainConfig, train
+from deephedging.evaluation import expected_shortfall
+from deephedging.frictions import NoCost, ProportionalCost
 from deephedging.instruments import BasketCall, GeometricBasketCall
 from deephedging.market import CorrelatedGBMSimulator, GBMSimulator, MarketState, NoiseSpec
+from deephedging.policies import FeedForwardPolicy
+from deephedging.policies.base import HedgePolicy
 from deephedging.pricing import MonteCarloPricer
-from deephedging.training import pnl_from_positions
+from deephedging.training import hedge_pnl, pnl_from_positions
 
 _CORRELATION = (
     (1.0, 0.6, 0.3),
@@ -118,15 +123,13 @@ def test_pnl_from_positions_contracts_asset_axis() -> None:
 
 
 def test_multi_asset_loop_matches_vectorised_oracle() -> None:
-    from deephedging import MultiAssetFeatures
-    from deephedging.policies.base import HedgePolicy
-    from deephedging.training import hedge_pnl
 
     class ConstantVectorPolicy(HedgePolicy):
         def __init__(self, values: tuple[float, ...]) -> None:
             super().__init__()
             self.values = values
 
+        @override
         def forward(
             self, features: torch.Tensor, state: torch.Tensor | None = None
         ) -> tuple[torch.Tensor, torch.Tensor | None]:
@@ -156,11 +159,6 @@ def test_multi_asset_loop_matches_vectorised_oracle() -> None:
 
 @pytest.mark.slow
 def test_multi_asset_training_beats_no_hedge() -> None:
-    from deephedging import CVaR, MultiAssetFeatures, TrainConfig, train
-    from deephedging.evaluation import expected_shortfall
-    from deephedging.frictions import NoCost
-    from deephedging.policies import FeedForwardPolicy
-    from deephedging.training import hedge_pnl
 
     torch.manual_seed(67)
     sim = CorrelatedGBMSimulator(
@@ -200,11 +198,11 @@ def test_multi_asset_training_beats_no_hedge() -> None:
 
 
 def test_invalid_correlation_rejected() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="correlation must be 2x2"):
         CorrelatedGBMSimulator(
             s0=100.0, sigmas=(0.2, 0.3), correlation=((1.0, 0.5),), maturity=1.0, n_steps=5
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="correlation must be symmetric"):
         CorrelatedGBMSimulator(
             s0=100.0,
             sigmas=(0.2, 0.3),
@@ -212,7 +210,7 @@ def test_invalid_correlation_rejected() -> None:
             maturity=1.0,
             n_steps=5,
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="correlation must be positive definite"):
         CorrelatedGBMSimulator(
             s0=100.0,
             sigmas=(0.2, 0.3),

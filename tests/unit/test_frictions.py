@@ -31,9 +31,9 @@ def test_impact_is_nonnegative_and_zero_at_no_trade() -> None:
 
 
 def test_impact_rejects_invalid_parameters() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="coefficient must be non-negative"):
         PowerLawImpactCost(coefficient=-1e-3)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="exponent must be at least one"):
         PowerLawImpactCost(coefficient=1e-3, exponent=0.5)
 
 
@@ -56,5 +56,5 @@ def test_bid_ask_reduces_to_proportional_when_symmetric() -> None:
 
 
 def test_bid_ask_rejects_negative_half_spread() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="half-spreads must be non-negative"):
         BidAskCost(bid_half_spread=-1e-3, ask_half_spread=1e-3)

@@ -3,6 +3,7 @@
 import math
 
 import torch
+from torch.distributions import Poisson
 
 from deephedging.evaluation.black_scholes import bs_call_price
 
@@ -26,7 +27,9 @@ def merton_call_price(
     term is undiscounted because this codebase prices in a zero-rate
     economy; the alternative textbook form reweights by the jump-size
     factor instead, and mixing the two double-counts it. The series is
-    truncated where the Poisson weights are far below double round-off.
+    truncated where the Poisson weights are far below double round-off, and
+    every term is priced by one broadcast Black-Scholes call weighted by
+    ``torch.distributions.Poisson``.
 
     Args:
         spot: Spot price.
@@ -41,22 +44,17 @@ def merton_call_price(
         Scalar call price in float64.
 
     Raises:
-        ValueError: If both volatilities vanish, leaving the zero-jump
+        ValueError: If ``sigma`` is not positive, leaving the zero-jump
             term without a defined Black-Scholes price.
     """
-    if sigma <= 0.0 and jump_vol <= 0.0:
-        raise ValueError("sigma and jump_vol cannot both be zero")
+    if sigma <= 0.0:
+        msg = f"sigma must be positive, got {sigma}"
+        raise ValueError(msg)
+    counts = torch.arange(_SERIES_TERMS, dtype=torch.float64)
+    expected_jumps = torch.tensor(jump_intensity * tau, dtype=torch.float64)
+    weights = Poisson(expected_jumps).log_prob(counts).exp()
     mean_jump_size = math.exp(jump_mean + 0.5 * jump_vol**2) - 1.0
-    total = torch.zeros((), dtype=torch.float64)
-    log_weight_base = -jump_intensity * tau
-    for count in range(_SERIES_TERMS):
-        log_weight = (
-            log_weight_base
-            + count * math.log(max(jump_intensity * tau, 1e-300))
-            - math.lgamma(count + 1.0)
-        )
-        sigma_n = math.sqrt(sigma**2 + count * jump_vol**2 / tau)
-        rate_n = -jump_intensity * mean_jump_size + count * (jump_mean + 0.5 * jump_vol**2) / tau
-        discounted = bs_call_price(spot, strike, sigma_n, tau, rate=rate_n)
-        total = total + math.exp(log_weight) * discounted * math.exp(rate_n * tau)
-    return total
+    sigma_n = torch.sqrt(sigma**2 + counts * jump_vol**2 / tau)
+    rate_n = -jump_intensity * mean_jump_size + counts * (jump_mean + 0.5 * jump_vol**2) / tau
+    prices = bs_call_price(spot, strike, sigma_n, tau, rate=rate_n) * torch.exp(rate_n * tau)
+    return (weights * prices).sum()

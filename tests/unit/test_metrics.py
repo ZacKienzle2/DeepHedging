@@ -34,7 +34,7 @@ def test_expected_shortfall_exceeds_mean_loss() -> None:
 
 def test_expected_shortfall_rejects_invalid_alpha() -> None:
     pnl = _pnl_sample(n=100)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"alpha must be in \(0, 1\)"):
         expected_shortfall(pnl, alpha=0.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"alpha must be in \(0, 1\)"):
         expected_shortfall(pnl, alpha=1.0)

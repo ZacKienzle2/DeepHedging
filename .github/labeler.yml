@@ -1,0 +1,75 @@
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/actions/**"
+          - ".github/dependabot.yml"
+          - ".github/labeler.yml"
+
+github-config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/ISSUE_TEMPLATE/**"
+          - ".github/PULL_REQUEST_TEMPLATE.md"
+          - ".github/CODEOWNERS"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/package.json"
+          - "**/package-lock.json"
+          - "**/yarn.lock"
+          - "**/pnpm-lock.yaml"
+          - "**/requirements*.txt"
+          - "**/pyproject.toml"
+          - "**/poetry.lock"
+          - "**/uv.lock"
+          - "**/Pipfile*"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
+          - "**/go.mod"
+          - "**/go.sum"
+          - "**/Gemfile*"
+          - "**/composer.json"
+          - "**/composer.lock"
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "SECURITY.md"
+          - ".github/workflows/codeql*.yml"
+          - ".github/workflows/security*.yml"
+
+test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**"
+          - "test/**"
+          - "**/*_test.*"
+          - "**/*.test.*"
+          - "**/test_*.*"
+          - "**/spec/**"
+
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Makefile"
+          - "CMakeLists.txt"
+          - "**/CMakeLists.txt"
+          - "**/Dockerfile*"
+          - "**/docker-compose*.yml"
+          - ".dockerignore"
+
+python:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.py"
+          - "**/*.pyi"
+          - "pyproject.toml"
+          - ".python-version"

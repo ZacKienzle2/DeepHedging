@@ -2,6 +2,7 @@
 
 import os
 import warnings
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, cast
 
@@ -18,6 +19,8 @@ from deephedging.market.tilted import LOG_WEIGHT_CHANNEL
 from deephedging.policies.base import HedgePolicy
 from deephedging.risk.base import RiskMeasure
 from deephedging.training.engine import hedge_pnl
+
+_WARMUP_ITERATIONS = 3
 
 
 @dataclass(frozen=True)
@@ -45,28 +48,32 @@ class TrainConfig:
             toolchain; incompatible with ``checkpoint_steps``.
         amp: Whether to run the policy network under bfloat16 autocast;
             see :func:`~deephedging.training.engine.hedge_pnl`.
-        graph_episode: Whether to capture the whole episode, forward and
-            backward through loss, in one CUDA graph and replay it per
-            iteration. The training loop is dispatch-bound at small
-            network widths, with the host issuing tens of microsecond
-            kernels while the device idles; replay collapses the entire
-            iteration into one launch. The episode is the correct
-            capture unit because a graphed callable keeps static saved
-            activations, so capturing the per-step policy and replaying
-            it many times before a single backward corrupts gradients.
-            Auxiliary channels such as the Heston variance are passed
-            alongside the spot grid in sorted key order. Capture keeps
-            a private memory pool that roughly doubles the resident
-            activation footprint, and a batch that overflows physical
-            device memory degrades silently into host paging at a
-            throughput collapse of more than an order of magnitude, so
-            the trainer warns when the post-capture reservation
-            approaches the device capacity, tightening the threshold on
-            Windows where the display driver pages under pressure. Combining capture with
-            gradient checkpointing trades replayed recompute for that
-            footprint and lifts the batch ceiling. Requires CUDA and a
-            fixed batch size; mutually exclusive with compilation and
-            autocast.
+        graph_episode: Whether to capture the whole training iteration,
+            the episode forward, the backward, gradient clipping and the
+            optimiser step, in one CUDA graph and replay it per iteration.
+            This is the whole-network capture of the PyTorch CUDA graphs
+            documentation: the optimiser is Adam with ``capturable`` set,
+            so its step counters and learning rates live on the device and
+            a replay advances them without a host round trip. The training
+            loop is dispatch-bound at small network widths, with the host
+            issuing tens of microsecond kernels while the device idles, and
+            replay collapses the iteration into one launch. Capture runs a
+            few warm-up iterations on a side stream first, as the
+            documentation requires, and then restores the parameters and
+            clears the optimiser state, so the captured run starts from the
+            same point as an eager one. Auxiliary channels such as the
+            Heston variance are copied into static buffers alongside the
+            spot grid in sorted key order. Capture keeps a private memory
+            pool that roughly doubles the resident activation footprint,
+            and a batch that overflows physical device memory degrades
+            silently into host paging at a throughput collapse of more than
+            an order of magnitude, so the trainer warns when the
+            post-capture reservation approaches the device capacity,
+            tightening the threshold on Windows where the display driver
+            pages under pressure. Combining capture with gradient
+            checkpointing trades replayed recompute for that footprint and
+            lifts the batch ceiling. Requires CUDA and a fixed batch size;
+            mutually exclusive with compilation.
         regenerate_paths: Whether to drop the path grid after the
             forward pass and regenerate it from its noise stream inside
             the backward. Every simulator replays bitwise from a
@@ -84,27 +91,29 @@ class TrainConfig:
         graph_generate: Whether the captured graph also generates its
             batch. The fused kernels offer an offset variant that reads
             the shifted Philox subsequence from device memory at launch
-            rather than from a frozen host argument, so updating one
-            element in place redraws a fresh batch on every replay and
-            the entire training iteration, generation included, becomes
-            a single graph launch. Requires ``graph_episode``, a seed
-            to address the streams, and a simulator exposing
-            ``simulate_with_offset``.
+            rather than from a frozen host argument, and the captured
+            iteration advances that offset in place after drawing, so each
+            replay trains on the next stream with generation included and
+            nothing issued from the host but the replay itself. Requires
+            ``graph_episode``, a seed to address the streams, and a
+            simulator exposing ``simulate_with_offset``.
         grad_clip_norm: Optional ceiling on the global gradient norm across
             the policy and risk parameters, applied between the backward and
             the optimiser step. The tail objectives put almost all of their
             gradient mass on the rare worst paths, so a single extreme batch
             can produce a step that undoes many good ones; clipping bounds
-            that step without changing the well-behaved iterations. Applied
-            eagerly outside any captured region, so it composes with graph
-            capture. Default off preserves the unclipped behaviour.
+            that step without changing the well-behaved iterations. The
+            norm and the rescale are device operations with no host
+            synchronisation, so clipping is captured with the rest of the
+            iteration. Default off preserves the unclipped behaviour.
         lr_schedule: Optional learning-rate schedule, ``"cosine"`` or
             ``"linear"``, decaying every parameter group proportionally over
             ``n_iterations`` steps. A constant rate large enough to converge
             quickly early tends to oscillate around the optimum late;
-            annealing keeps the early speed and settles the tail. The
-            schedule advances the optimiser's rates eagerly, so it is
-            compatible with episode capture, which records only the loss.
+            annealing keeps the early speed and settles the tail. Under
+            capture the rates are device tensors the scheduler fills in
+            place, which is what lets a replayed optimiser step read the
+            current rate.
     """
 
     n_iterations: int = 2000
@@ -123,22 +132,31 @@ class TrainConfig:
     lr_schedule: str | None = None
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.compile_policy and self.checkpoint_steps:
-            raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
-        if self.graph_episode and (self.compile_policy or self.amp):
-            raise ValueError("graph_episode excludes compilation and autocast")
+            msg = "compile_policy and checkpoint_steps are mutually exclusive"
+            raise ValueError(msg)
+        if self.graph_episode and self.compile_policy:
+            msg = "graph_episode excludes compilation"
+            raise ValueError(msg)
         if self.regenerate_paths and self.graph_episode:
-            raise ValueError("regenerate_paths and graph_episode are mutually exclusive")
+            msg = "regenerate_paths and graph_episode are mutually exclusive"
+            raise ValueError(msg)
         if self.regenerate_paths and self.seed is None:
-            raise ValueError("regenerate_paths requires a seed for deterministic replay")
+            msg = "regenerate_paths requires a seed for deterministic replay"
+            raise ValueError(msg)
         if self.graph_generate and not self.graph_episode:
-            raise ValueError("graph_generate requires graph_episode")
+            msg = "graph_generate requires graph_episode"
+            raise ValueError(msg)
         if self.graph_generate and self.seed is None:
-            raise ValueError("graph_generate requires a seed to address the streams")
+            msg = "graph_generate requires a seed to address the streams"
+            raise ValueError(msg)
         if self.grad_clip_norm is not None and self.grad_clip_norm <= 0.0:
-            raise ValueError(f"grad_clip_norm must be positive, got {self.grad_clip_norm}")
+            msg = f"grad_clip_norm must be positive, got {self.grad_clip_norm}"
+            raise ValueError(msg)
         if self.lr_schedule is not None and self.lr_schedule not in ("cosine", "linear"):
-            raise ValueError(f"lr_schedule must be 'cosine' or 'linear', got {self.lr_schedule!r}")
+            msg = f"lr_schedule must be 'cosine' or 'linear', got {self.lr_schedule!r}"
+            raise ValueError(msg)
 
 
 class _OffsetSimulator(Protocol):
@@ -147,70 +165,6 @@ class _OffsetSimulator(Protocol):
     def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
         """Simulates a batch addressed by the device-resident offset."""
         ...
-
-
-def _importance_weights(state: MarketState) -> torch.Tensor | None:
-    log_weight = state.aux.get(LOG_WEIGHT_CHANNEL)
-    if log_weight is None:
-        return None
-    return torch.exp(log_weight.to(torch.float64))
-
-
-class _EpisodeLoss(torch.nn.Module):
-    """Whole-iteration module mapping market tensors to the risk objective.
-
-    Registers the policy and the risk measure as submodules so a CUDA
-    graph capture of this module records their forward and backward
-    passes and accumulates gradients into their parameters. Auxiliary
-    channels are passed positionally in a fixed key order, because graph
-    capture requires a stable tensor-only signature.
-    """
-
-    def __init__(
-        self,
-        policy: HedgePolicy,
-        payoff: Payoff,
-        cost_model: CostModel,
-        risk_measure: RiskMeasure,
-        feature_map: FeatureMap | None,
-        premium: float | torch.Tensor,
-        liquidate_terminal: bool,
-        aux_keys: tuple[str, ...],
-        checkpoint_steps: bool,
-    ) -> None:
-        super().__init__()
-        self.policy = policy
-        self.risk_measure = risk_measure
-        self.payoff = payoff
-        self.cost_model = cost_model
-        self.feature_map = feature_map
-        self.premium = premium
-        self.liquidate_terminal = liquidate_terminal
-        self.aux_keys = aux_keys
-        self.checkpoint_steps = checkpoint_steps
-
-    def forward(self, spot: torch.Tensor, *aux: torch.Tensor) -> torch.Tensor:
-        """Runs one full episode and reduces to the scalar objective.
-
-        Args:
-            spot: Price grid of shape ``(n_steps + 1, n_paths)``.
-            aux: Auxiliary channels in ``aux_keys`` order.
-
-        Returns:
-            Scalar risk objective.
-        """
-        state = MarketState(spot=spot, aux=dict(zip(self.aux_keys, aux, strict=True)))
-        pnl = hedge_pnl(
-            state,
-            self.policy,
-            self.payoff,
-            self.cost_model,
-            premium=self.premium,
-            liquidate_terminal=self.liquidate_terminal,
-            checkpoint_steps=self.checkpoint_steps,
-            feature_map=self.feature_map,
-        )
-        return self.risk_measure(-pnl, weights=_importance_weights(state))
 
 
 @dataclass
@@ -224,45 +178,127 @@ class TrainResult:
     losses: list[float] = field(default_factory=list)
 
 
-class _GeneratedEpisodeLoss(torch.nn.Module):
-    """Episode loss that generates its own batch inside the capture.
+def _importance_weights(state: MarketState) -> torch.Tensor | None:
+    log_weight = state.aux.get(LOG_WEIGHT_CHANNEL)
+    if log_weight is None:
+        return None
+    return torch.exp(log_weight.to(torch.float64))
 
-    The simulator kernel reads the shifted Philox subsequence from the
-    offset tensor at launch time, so capturing this module records
-    generation, the episode forward, and the backward as one replayable
-    unit, and updating the offset in place redraws a fresh batch on
-    every replay. A host-argument kernel could not do this, because
-    capture freezes launch arguments and every replay would train on
-    the same paths.
+
+def _optimizer(
+    config: TrainConfig,
+    policy_params: list[torch.nn.Parameter],
+    risk_params: list[torch.nn.Parameter],
+    device: torch.device,
+) -> torch.optim.Adam:
+    """Builds Adam over the policy and risk parameter groups.
+
+    Fused on CUDA, and capturable with device-tensor learning rates when the
+    iteration is captured, so a replayed step reads the scheduler's rate.
+
+    Args:
+        config: Training hyperparameters.
+        policy_params: Parameters of the hedging policy.
+        risk_params: Parameters of the risk measure, possibly empty.
+        device: Device holding the parameters.
+
+    Returns:
+        The optimiser.
     """
 
-    def __init__(
-        self,
-        simulator: _OffsetSimulator,
-        episode: _EpisodeLoss,
-        n_paths: int,
-        seed: int,
-        aux_keys: tuple[str, ...],
-    ) -> None:
-        super().__init__()
-        self.simulator = simulator
-        self.episode = episode
-        self.n_paths = n_paths
-        self.seed = seed
-        self.aux_keys = aux_keys
+    def rate(value: float) -> float | torch.Tensor:
+        return torch.tensor(value, device=device) if config.graph_episode else value
 
-    def forward(self, offset: torch.Tensor) -> torch.Tensor:
-        """Generates the batch the offset names and scores the episode.
+    groups: list[dict[str, object]] = [{"params": policy_params, "lr": rate(config.lr)}]
+    if risk_params:
+        risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
+        groups.append({"params": risk_params, "lr": rate(risk_lr)})
+    return torch.optim.Adam(groups, fused=device.type == "cuda", capturable=config.graph_episode)
 
-        Args:
-            offset: One-element int64 CUDA tensor holding the shifted
-                subsequence base.
 
-        Returns:
-            Scalar risk objective.
-        """
-        state = self.simulator.simulate_with_offset(self.n_paths, self.seed, offset)
-        return self.episode(state.spot, *(state.aux[key] for key in self.aux_keys))
+def _schedule(
+    config: TrainConfig, optimizer: torch.optim.Optimizer
+) -> torch.optim.lr_scheduler.LRScheduler | None:
+    """Builds the configured learning-rate schedule, if any.
+
+    Args:
+        config: Training hyperparameters.
+        optimizer: The optimiser whose rates the schedule decays.
+
+    Returns:
+        The schedule, or None for a constant rate.
+    """
+    total = max(1, config.n_iterations)
+    if config.lr_schedule == "cosine":
+        return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total)
+    if config.lr_schedule == "linear":
+        return torch.optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=1.0, end_factor=1e-3, total_iters=total
+        )
+    return None
+
+
+def _warn_if_capture_crowds(device: torch.device) -> None:
+    """Warns when the capture pool leaves too little device memory free.
+
+    Args:
+        device: The CUDA device the graph was captured on.
+    """
+    reserved = torch.cuda.memory_reserved(device)
+    capacity = torch.cuda.get_device_properties(device).total_memory
+    headroom = 0.7 if os.name == "nt" else 0.8
+    if reserved > headroom * capacity:
+        warnings.warn(
+            f"graph capture reserves {reserved / 2**30:.1f}GiB of "
+            f"{capacity / 2**30:.1f}GiB; batches beyond physical memory "
+            "page through the host and collapse throughput",
+            stacklevel=3,
+        )
+
+
+def _capture(
+    iteration: Callable[[], torch.Tensor],
+    parameters: Sequence[torch.Tensor],
+    optimizer: torch.optim.Optimizer,
+) -> tuple[torch.cuda.CUDAGraph, torch.Tensor]:
+    """Captures one training iteration as a CUDA graph.
+
+    Follows the whole-network recipe of the PyTorch CUDA graphs notes:
+    warm up on a side stream so lazily allocated optimiser state and
+    autograd buffers exist before capture, then capture with the gradients
+    unset so the backward allocates them from the graph's private pool.
+    The warm-up steps move the parameters and fill the Adam moments, so
+    both are restored afterwards, which keeps the first replay identical
+    to the first eager iteration.
+
+    Args:
+        iteration: Runs the forward, the backward and the optimiser step,
+            returning the loss.
+        parameters: Every parameter the optimiser updates.
+        optimizer: The capturable optimiser stepped inside ``iteration``.
+
+    Returns:
+        The captured graph and its static loss tensor.
+    """
+    initial = [parameter.detach().clone() for parameter in parameters]
+    side = torch.cuda.Stream()
+    side.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(side):
+        for _ in range(_WARMUP_ITERATIONS):
+            optimizer.zero_grad(set_to_none=True)
+            iteration()
+    torch.cuda.current_stream().wait_stream(side)
+    graph = torch.cuda.CUDAGraph()
+    optimizer.zero_grad(set_to_none=True)
+    with torch.cuda.graph(graph):
+        static_loss = iteration()
+    with torch.no_grad():
+        for parameter, value in zip(parameters, initial, strict=True):
+            parameter.copy_(value)
+        for moments in optimizer.state.values():
+            for tensor in moments.values():
+                tensor.zero_()
+    return graph, static_loss
 
 
 def train(
@@ -282,7 +318,8 @@ def train(
     The risk measure warm-starts its auxiliary state on an initial batch so
     early iterations optimise the intended objective, and is moved to the
     policy device so its parameters never force cross-device synchronisation
-    inside the loop.
+    inside the loop. On CUDA the optimiser is PyTorch's fused Adam, which
+    updates every parameter in one kernel launch.
 
     Args:
         simulator: Market path simulator.
@@ -303,7 +340,11 @@ def train(
     """
     device = next(policy.parameters()).device
     if config.graph_episode and device.type != "cuda":
-        raise ValueError("graph_episode requires the policy on a CUDA device")
+        msg = "graph_episode requires the policy on a CUDA device"
+        raise ValueError(msg)
+    if config.graph_generate and not hasattr(simulator, "simulate_with_offset"):
+        msg = "graph_generate requires a simulator exposing simulate_with_offset"
+        raise ValueError(msg)
     risk_measure.to(device)
     base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
     stepper: HedgePolicy = policy
@@ -314,22 +355,11 @@ def train(
         noise = base_noise.child(index) if base_noise is not None else None
         return simulator.simulate(config.batch_paths, noise=noise).to(device)
 
-    param_groups: list[dict[str, object]] = [{"params": list(policy.parameters()), "lr": config.lr}]
+    policy_params = list(policy.parameters())
     risk_params = list(risk_measure.parameters())
-    if risk_params:
-        risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
-        param_groups.append({"params": risk_params, "lr": risk_lr})
-    optimizer = torch.optim.Adam(param_groups)
-    clip_params = list(policy.parameters()) + risk_params
-    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
-    if config.lr_schedule == "cosine":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=max(1, config.n_iterations)
-        )
-    elif config.lr_schedule == "linear":
-        scheduler = torch.optim.lr_scheduler.LinearLR(
-            optimizer, start_factor=1.0, end_factor=1e-3, total_iters=max(1, config.n_iterations)
-        )
+    optimizer = _optimizer(config, policy_params, risk_params, device)
+    scheduler = _schedule(config, optimizer)
+    clip_params = policy_params + risk_params
     warmup_state = batch_state(0)
     with torch.no_grad():
         warmup_pnl = hedge_pnl(
@@ -343,53 +373,6 @@ def train(
             amp=config.amp,
         )
         risk_measure.warm_start(-warmup_pnl, weights=_importance_weights(warmup_state))
-    graphed_loss = None
-    offset_input = torch.empty(0, dtype=torch.int64)
-    aux_keys: tuple[str, ...] = ()
-    if config.graph_episode:
-        aux_keys = tuple(sorted(warmup_state.aux))
-        episode = _EpisodeLoss(
-            policy,
-            payoff,
-            cost_model,
-            risk_measure,
-            feature_map,
-            premium,
-            config.liquidate_terminal,
-            aux_keys,
-            config.checkpoint_steps,
-        )
-        if config.graph_generate:
-            if not hasattr(simulator, "simulate_with_offset"):
-                raise ValueError(
-                    "graph_generate requires a simulator exposing simulate_with_offset"
-                )
-            assert config.seed is not None
-            offset_input = torch.zeros((1,), dtype=torch.int64, device=device)
-            generated = _GeneratedEpisodeLoss(
-                cast(_OffsetSimulator, simulator),
-                episode,
-                config.batch_paths,
-                config.seed,
-                aux_keys,
-            )
-            graphed_loss = torch.cuda.make_graphed_callables(generated, (offset_input,))
-        else:
-            sample_args = (
-                warmup_state.spot.clone(),
-                *(warmup_state.aux[key].clone() for key in aux_keys),
-            )
-            graphed_loss = torch.cuda.make_graphed_callables(episode, sample_args)
-        reserved = torch.cuda.memory_reserved(device)
-        capacity = torch.cuda.get_device_properties(device).total_memory
-        headroom = 0.7 if os.name == "nt" else 0.8
-        if reserved > headroom * capacity:
-            warnings.warn(
-                f"graph capture reserves {reserved / 2**30:.1f}GiB of "
-                f"{capacity / 2**30:.1f}GiB; batches beyond physical memory "
-                "page through the host and collapse throughput",
-                stacklevel=2,
-            )
 
     def episode_loss(state: MarketState) -> torch.Tensor:
         pnl = hedge_pnl(
@@ -405,38 +388,72 @@ def train(
         )
         return risk_measure(-pnl, weights=_importance_weights(state))
 
+    def descend(loss: torch.Tensor) -> torch.Tensor:
+        loss.backward()
+        if config.grad_clip_norm is not None:
+            torch.nn.utils.clip_grad_norm_(clip_params, config.grad_clip_norm)
+        optimizer.step()
+        return loss
+
     def regenerated_loss(index: int) -> torch.Tensor:
         def from_noise(*_parameters: torch.Tensor) -> torch.Tensor:
             return episode_loss(batch_state(index))
 
         return cast(
-            torch.Tensor,
-            checkpoint(from_noise, *policy.parameters(), *risk_params, use_reentrant=False),
+            "torch.Tensor",
+            checkpoint(from_noise, *policy_params, *risk_params, use_reentrant=False),
         )
+
+    graph: torch.cuda.CUDAGraph | None = None
+    static_loss = torch.empty(0)
+    aux_keys = tuple(sorted(warmup_state.aux))
+    static_channels = (
+        warmup_state.spot.clone(),
+        *(warmup_state.aux[key].clone() for key in aux_keys),
+    )
+    offset = torch.zeros((1,), dtype=torch.int64, device=device)
+    if config.graph_episode:
+        if config.graph_generate:
+            assert config.seed is not None
+            generator = cast("_OffsetSimulator", simulator)
+            seed = config.seed
+
+            def captured() -> torch.Tensor:
+                state = generator.simulate_with_offset(config.batch_paths, seed, offset)
+                offset.add_(1 << 32)
+                return descend(episode_loss(state))
+
+        else:
+
+            def captured() -> torch.Tensor:
+                spot, *aux = static_channels
+                state = MarketState(spot=spot, aux=dict(zip(aux_keys, aux, strict=True)))
+                return descend(episode_loss(state))
+
+        graph, static_loss = _capture(captured, clip_params, optimizer)
+        if base_noise is not None:
+            offset.fill_(base_noise.child(1).stream << 32)
+        _warn_if_capture_crowds(device)
 
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
-        if graphed_loss is not None and config.graph_generate:
-            assert base_noise is not None
-            spec = base_noise.child(iteration + 1)
-            offset_input.fill_(spec.stream << 32)
-            loss = cast(torch.Tensor, graphed_loss(offset_input))
-            optimizer.zero_grad(set_to_none=False)
-        elif graphed_loss is not None:
-            state = batch_state(iteration + 1)
-            channels = (state.spot, *(state.aux[key] for key in aux_keys))
-            loss = cast(torch.Tensor, graphed_loss(*channels))
-            optimizer.zero_grad(set_to_none=False)
-        elif config.regenerate_paths:
-            loss = regenerated_loss(iteration + 1)
-            optimizer.zero_grad(set_to_none=True)
+        if graph is not None:
+            if not config.graph_generate:
+                state = batch_state(iteration + 1)
+                for buffer, channel in zip(
+                    static_channels,
+                    (state.spot, *(state.aux[key] for key in aux_keys)),
+                    strict=True,
+                ):
+                    buffer.copy_(channel)
+            graph.replay()
+            loss = static_loss
         else:
-            loss = episode_loss(batch_state(iteration + 1))
             optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        if config.grad_clip_norm is not None:
-            torch.nn.utils.clip_grad_norm_(clip_params, config.grad_clip_norm)
-        optimizer.step()
+            if config.regenerate_paths:
+                loss = descend(regenerated_loss(iteration + 1))
+            else:
+                loss = descend(episode_loss(batch_state(iteration + 1)))
         if scheduler is not None:
             scheduler.step()
         loss_history.append(loss.detach().clone())

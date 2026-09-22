@@ -1,41 +1,113 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  checks:
+  pre-commit:
+    name: Run pre-commit hooks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
         with:
-          enable-cache: true
-          cache-dependency-glob: uv.lock
-      - name: Install dependencies
-        run: uv sync --extra dev
-      - name: Lint
-        run: uv run ruff check .
-      - name: Format check
-        run: uv run ruff format --check .
-      - name: Type check
-        run: uv run pyright
-      - name: Fast tests
-        run: uv run pytest -q -m "not slow and not gpu"
-      - name: Full tests with coverage
-        run: >-
-          uv run --with pytest-cov pytest -q -m "not gpu"
-          --cov=deephedging --cov-report=term-missing --cov-report=xml
-      - name: Upload coverage
-        if: always()
-        uses: actions/upload-artifact@v4
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          name: coverage
-          path: coverage.xml
-          if-no-files-found: ignore
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+
+      # The official action installs pre-commit and caches the hook
+      # environments on the configuration's hash, which is the recipe the
+      # pre-commit documentation gives for continuous integration. Its default
+      # is --all-files, so a hook added to the configuration is applied to the
+      # whole tree by the change that adds it.
+      - name: Run pre-commit
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        # pyright reads the project's synced environment, which the Python
+        # workflow builds, so the hook runs there and pre-commit's SKIP variable
+        # leaves it out of this job.
+        env:
+          SKIP: pyright
+
+  gitleaks:
+    name: Scan for leaked secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          # The scan walks history, which needs all of it.
+          fetch-depth: 0
+
+      # The pre-commit hook scans what is staged, which is the right scan
+      # while committing and finds nothing on a runner. This scans the
+      # repository's history. The official action needs a licence key for
+      # organisation accounts only.
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  link-check:
+    name: Check Markdown links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Link checker
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
+        with:
+          args: --no-progress --verbose --config lychee.toml './**/*.md'
+          fail: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  ci-summary:
+    name: CI summary gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs:
+      - pre-commit
+      - gitleaks
+      - link-check
+    if: always()
+    steps:
+      # re-actors/alls-green reads the needs context and fails on any failed
+      # or cancelled job, so branch protection requires this one name rather
+      # than every job above.
+      - name: Decide whether the needed jobs succeeded
+        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}

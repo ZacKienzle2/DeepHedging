@@ -1,0 +1,37 @@
+extends: default
+
+rules:
+  # prettier wraps YAML and is what this linter reads; a scalar prettier cannot
+  # break is not an error a second tool should raise.
+  line-length: disable
+  document-start: disable
+  truthy:
+    # The rule's own option. Yes and No are the spelling clang-format's
+    # documentation uses for its booleans, so .clang-format is linted like
+    # every other YAML file rather than listed as an exception.
+    allowed-values: ["true", "false", "on", "off", "Yes", "No"]
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  # prettier formats every YAML file here and this lints what prettier writes,
+  # so these three rules take prettier's documented style: a space inside a
+  # flow mapping's braces (bracketSpacing, default true), none inside a flow
+  # sequence's brackets, none in an empty pair, and an indent that follows
+  # .editorconfig for the file, which is what "consistent" accepts.
+  braces:
+    min-spaces-inside: 1
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+  indentation:
+    spaces: consistent
+    indent-sequences: consistent
+
+# The generated ignore file already lists the caches and build directories, and
+# yamllint reads it directly rather than keeping a second copy. The key is
+# mutually exclusive with `ignore`, so the list is gone.
+ignore-from-file: [.gitignore]

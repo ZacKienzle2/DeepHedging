@@ -39,9 +39,13 @@ def european_greeks(
 
     Differentiating the pricing map is exact to machine precision, where a
     finite-difference bump trades truncation error against catastrophic
-    cancellation and has to be retuned for each Greek and each regime. The
-    inputs broadcast to a common shape and are differentiated elementwise, so
-    one call returns a whole sensitivity surface rather than a single point.
+    cancellation and has to be retuned for each Greek and each regime. One
+    reverse sweep returns all four first-order Greeks, the adjoint mode that
+    Capriotti (2011) shows costs a small bounded multiple of one pricing call
+    whatever the number of sensitivities, and a second sweep over the first
+    one's graph gives gamma. The inputs broadcast to a common shape and are
+    differentiated elementwise, so one call returns a whole sensitivity
+    surface rather than a single point.
 
     The price function must be written in differentiable tensor operations of
     its four arguments and accept them at the broadcast shape. Closed forms

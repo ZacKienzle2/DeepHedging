@@ -1,8 +1,10 @@
 """Feedforward hedging policy."""
 
-import torch
-from torch import nn
+from typing import override
 
+import torch
+
+from deephedging.networks import mlp
 from deephedging.policies.base import HedgePolicy
 
 
@@ -29,15 +31,9 @@ class FeedForwardPolicy(HedgePolicy):
         """
         super().__init__()
         self.n_outputs = n_outputs
-        layers: list[nn.Module] = []
-        width = n_features
-        for size in hidden_sizes:
-            layers.append(nn.Linear(width, size))
-            layers.append(nn.SiLU())
-            width = size
-        layers.append(nn.Linear(width, n_outputs))
-        self.net = nn.Sequential(*layers)
+        self.net = mlp(n_features, hidden_sizes, n_outputs)
 
+    @override
     def forward(
         self, features: torch.Tensor, state: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:

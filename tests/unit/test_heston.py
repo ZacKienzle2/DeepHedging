@@ -8,7 +8,7 @@ import torch
 from deephedging.market import HestonSimulator, NoiseSpec
 
 
-def _simulator(**overrides: float | int) -> HestonSimulator:
+def _simulator(**overrides: float) -> HestonSimulator:
     params: dict[str, float | int] = {
         "s0": 100.0,
         "v0": 0.04,
@@ -71,11 +71,11 @@ def test_negative_rho_skews_left_tail() -> None:
 
 
 def test_invalid_parameters_raise() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"rho must be in \[-1, 1\]"):
         _simulator(rho=1.5)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="kappa must be positive"):
         _simulator(kappa=0.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="v0 must be non-negative"):
         _simulator(v0=-0.01)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="xi must be non-negative"):
         _simulator(xi=-0.1)

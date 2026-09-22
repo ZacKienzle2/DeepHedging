@@ -13,6 +13,7 @@ import gc
 import torch
 
 from deephedging.experiment import load_records
+from deephedging.market import kernels_available
 
 
 def parse_study_arguments(fused_option: bool = False) -> argparse.Namespace:
@@ -31,11 +32,8 @@ def parse_study_arguments(fused_option: bool = False) -> argparse.Namespace:
     if fused_option:
         parser.add_argument("--fused", action="store_true")
     arguments = parser.parse_args()
-    if fused_option and arguments.fused:
-        from deephedging.market import kernels_available
-
-        if not kernels_available():
-            parser.error("--fused requires the CUDA kernel toolchain")
+    if fused_option and arguments.fused and not kernels_available():
+        parser.error("--fused requires the CUDA kernel toolchain")
     return arguments
 
 

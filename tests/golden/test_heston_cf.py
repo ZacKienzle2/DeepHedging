@@ -129,7 +129,7 @@ def test_implied_vol_rejects_arbitrage_violations() -> None:
 
 
 def test_invalid_params_rejected() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="kappa must be positive"):
         HestonParams(v0=0.04, kappa=0.0, theta=0.04, xi=0.5, rho=-0.7)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"rho must be in \(-1, 1\)"):
         HestonParams(v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-1.0)

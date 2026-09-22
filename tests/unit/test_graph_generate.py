@@ -23,6 +23,7 @@ from deephedging import (
     TrainConfig,
     train,
 )
+from deephedging.market import CudaGBMSimulator, CudaHestonSimulator, kernels_available
 
 _SIGMA = 0.2
 _MATURITY = 30 / 365
@@ -30,7 +31,6 @@ _STRIKE = 100.0
 
 
 def _require_kernels() -> None:
-    from deephedging.market import kernels_available
 
     if not kernels_available():
         pytest.skip("CUDA kernel toolchain unavailable")
@@ -39,7 +39,6 @@ def _require_kernels() -> None:
 @pytest.mark.gpu
 def test_offset_kernels_match_host_argument_kernels_bitwise() -> None:
     _require_kernels()
-    from deephedging.market import CudaGBMSimulator, CudaHestonSimulator
 
     gbm = CudaGBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=30)
     heston = CudaHestonSimulator(
@@ -59,7 +58,6 @@ def test_offset_kernels_match_host_argument_kernels_bitwise() -> None:
 @pytest.mark.gpu
 def test_generated_graph_matches_eager_training() -> None:
     _require_kernels()
-    from deephedging.market import CudaGBMSimulator
 
     def run(graphed: bool) -> list[float]:
         torch.manual_seed(48)
@@ -90,7 +88,6 @@ def test_generated_graph_matches_eager_training() -> None:
 @pytest.mark.gpu
 def test_replays_draw_fresh_batches() -> None:
     _require_kernels()
-    from deephedging.market import CudaGBMSimulator
 
     torch.manual_seed(49)
     sim = CudaGBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=8)

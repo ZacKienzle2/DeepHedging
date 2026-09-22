@@ -115,7 +115,8 @@ def make_arm(name: str, device: str) -> tuple[FeedForwardPolicy, FeatureMap]:
             FeedForwardPolicy(n_features=4, hidden_sizes=(64, 64)).to(device),
             RunningMaxFeatures(),
         )
-    raise ValueError(f"unknown arm {name}")
+    msg = f"unknown arm {name}"
+    raise ValueError(msg)
 
 
 def cost_model(rate: float) -> CostModel:

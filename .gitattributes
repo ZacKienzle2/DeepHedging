@@ -1,7 +1,7 @@
-# Combined from https://github.com/gitattributes/gitattributes (Common, Python)
-# Same source templates as https://www.toptal.com/developers/gitattributes
-
-### Common ###
+# Assembled by copier from github.com/gitattributes/gitattributes; the source
+# files are in the template repository, not here. A rule of this repository's
+# own is the gitattributes_own answer in .copier-answers.yml, rendered at the end.
+# Common settings that generally should always be used with your language specific settings
 
 # Auto detect text files and perform LF normalization
 *          text=auto
@@ -100,7 +100,7 @@
 .gitignore     export-ignore
 .gitkeep       export-ignore
 
-### Python ###
+# Basic .gitattributes for a python repo.
 
 # Source files
 # ============

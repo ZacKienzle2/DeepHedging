@@ -40,30 +40,38 @@ class CorrelatedGBMSimulator:
     device: str = "cpu"
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.s0 <= 0.0:
-            raise ValueError(f"s0 must be positive, got {self.s0}")
+            msg = f"s0 must be positive, got {self.s0}"
+            raise ValueError(msg)
         if not self.sigmas:
-            raise ValueError("sigmas must contain at least one asset")
+            msg = "sigmas must contain at least one asset"
+            raise ValueError(msg)
         if any(sigma < 0.0 for sigma in self.sigmas):
-            raise ValueError("every volatility must be non-negative")
+            msg = "every volatility must be non-negative"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)
         matrix = torch.tensor(self.correlation, dtype=torch.float64)
         n_assets = len(self.sigmas)
         if matrix.shape != (n_assets, n_assets):
-            raise ValueError(
-                f"correlation must be {n_assets}x{n_assets}, got {tuple(matrix.shape)}"
-            )
+            msg = f"correlation must be {n_assets}x{n_assets}, got {tuple(matrix.shape)}"
+            raise ValueError(msg)
         if not torch.allclose(matrix, matrix.T, atol=1e-12):
-            raise ValueError("correlation must be symmetric")
+            msg = "correlation must be symmetric"
+            raise ValueError(msg)
         if not torch.allclose(matrix.diagonal(), torch.ones(n_assets, dtype=torch.float64)):
-            raise ValueError("correlation must have a unit diagonal")
+            msg = "correlation must have a unit diagonal"
+            raise ValueError(msg)
         try:
             torch.linalg.cholesky(matrix)
         except RuntimeError as error:
-            raise ValueError("correlation must be positive definite") from error
+            msg = "correlation must be positive definite"
+            raise ValueError(msg) from error
 
     @property
     def n_assets(self) -> int:

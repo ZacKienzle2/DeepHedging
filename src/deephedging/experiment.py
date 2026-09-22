@@ -126,9 +126,5 @@ def load_records(path: str | Path) -> list[ExperimentRecord]:
     target = Path(path)
     if not target.exists():
         return []
-    records = []
     with target.open("r", encoding="ascii") as handle:
-        for line in handle:
-            if line.strip():
-                records.append(ExperimentRecord(**json.loads(line)))
-    return records
+        return [ExperimentRecord(**json.loads(line)) for line in handle if line.strip()]

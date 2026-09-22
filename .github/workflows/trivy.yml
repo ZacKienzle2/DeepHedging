@@ -1,0 +1,61 @@
+name: Trivy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "44 5 * * 2"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trivy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  filesystem:
+    name: Scan filesystem for vulns + misconfig + secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+          # Secrets belong to gitleaks and dependency advisories to
+          # OSV-Scanner, each of which fails the build. Trivy reported both
+          # with exit-code 0, so it was a third opinion nothing acted on.
+          scanners: misconfig
+          exit-code: 0
+
+      - name: Upload SARIF
+        # Code scanning takes SARIF from public repositories only.
+        # The scan itself runs either way, and fails on its own findings.
+        if: always() && github.event.repository.private == false
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs

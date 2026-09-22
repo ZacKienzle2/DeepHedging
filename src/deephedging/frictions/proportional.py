@@ -16,8 +16,10 @@ class ProportionalCost:
     rate: float
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.rate < 0.0:
-            raise ValueError(f"rate must be non-negative, got {self.rate}")
+            msg = f"rate must be non-negative, got {self.rate}"
+            raise ValueError(msg)
 
     def __call__(self, trade: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
         """Computes proportional cost of a trade.
@@ -55,10 +57,13 @@ class PerAssetProportionalCost:
     )
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if not self.rates:
-            raise ValueError("rates must contain at least one asset")
+            msg = "rates must contain at least one asset"
+            raise ValueError(msg)
         if any(rate < 0.0 for rate in self.rates):
-            raise ValueError(f"rates must be non-negative, got {self.rates}")
+            msg = f"rates must be non-negative, got {self.rates}"
+            raise ValueError(msg)
 
     def __call__(self, trade: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
         """Computes the per-asset proportional cost of a trade.
@@ -75,9 +80,8 @@ class PerAssetProportionalCost:
                 of rates.
         """
         if trade.shape[-1] != len(self.rates):
-            raise ValueError(
-                f"trade has {trade.shape[-1]} assets, cost model has {len(self.rates)} rates"
-            )
+            msg = f"trade has {trade.shape[-1]} assets, cost model has {len(self.rates)} rates"
+            raise ValueError(msg)
         key = (price.device, price.dtype)
         rates = self._cache.get(key)
         if rates is None:

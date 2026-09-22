@@ -75,11 +75,11 @@ def test_state_to_same_device_is_identity() -> None:
 
 
 def test_invalid_parameters_raise() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="s0 must be positive"):
         GBMSimulator(s0=-1.0, sigma=0.2, maturity=1.0, n_steps=10)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="sigma must be non-negative"):
         GBMSimulator(s0=100.0, sigma=-0.1, maturity=1.0, n_steps=10)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="maturity must be positive"):
         GBMSimulator(s0=100.0, sigma=0.2, maturity=0.0, n_steps=10)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="n_steps must be at least 1"):
         GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=0)

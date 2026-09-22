@@ -3,6 +3,7 @@
 import torch
 from torch import nn
 
+from deephedging.evaluation.metrics import weighted_quantile
 from deephedging.risk.base import RiskMeasure
 
 
@@ -34,7 +35,8 @@ class CVaR(RiskMeasure):
         """
         super().__init__()
         if not 0.0 < alpha < 1.0:
-            raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+            msg = f"alpha must be in (0, 1), got {alpha}"
+            raise ValueError(msg)
         self.alpha = alpha
         self.threshold = nn.Parameter(torch.zeros(()))
 
@@ -52,18 +54,10 @@ class CVaR(RiskMeasure):
             weights: Optional likelihood ratios matching ``loss``.
         """
         with torch.no_grad():
-            if weights is None:
+            if weights is None or not bool(weights.sum() > 0.0):
                 self.threshold.copy_(torch.quantile(loss, self.alpha))
             else:
-                total = weights.sum()
-                if not bool(total > 0.0):
-                    self.threshold.copy_(torch.quantile(loss, self.alpha))
-                    return
-                order = torch.argsort(loss)
-                cumulative = torch.cumsum(weights[order], dim=0) / total
-                position = int(torch.searchsorted(cumulative, self.alpha))
-                position = min(position, loss.shape[0] - 1)
-                self.threshold.copy_(loss[order][position])
+                self.threshold.copy_(weighted_quantile(loss, weights, self.alpha))
 
     def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
         """Evaluates the Rockafellar-Uryasev objective.
@@ -82,7 +76,8 @@ class CVaR(RiskMeasure):
             ValueError: If ``loss`` is not one-dimensional.
         """
         if loss.dim() != 1:
-            raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
+            msg = f"loss must be 1-dimensional, got shape {tuple(loss.shape)}"
+            raise ValueError(msg)
         excess = torch.relu(loss - self.threshold)
         if weights is not None:
             excess = excess * weights

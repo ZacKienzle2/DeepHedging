@@ -33,7 +33,8 @@ class Entropic(RiskMeasure):
         """
         super().__init__()
         if risk_aversion <= 0.0:
-            raise ValueError(f"risk_aversion must be positive, got {risk_aversion}")
+            msg = f"risk_aversion must be positive, got {risk_aversion}"
+            raise ValueError(msg)
         self.risk_aversion = risk_aversion
 
     def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
@@ -52,7 +53,8 @@ class Entropic(RiskMeasure):
             ValueError: If ``loss`` is not one-dimensional.
         """
         if loss.dim() != 1:
-            raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
+            msg = f"loss must be 1-dimensional, got shape {tuple(loss.shape)}"
+            raise ValueError(msg)
         a = self.risk_aversion
         n = loss.shape[0]
         exponent = a * loss

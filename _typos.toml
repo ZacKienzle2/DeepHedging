@@ -1,0 +1,20 @@
+# Managed by copier from ZacKienzle2/repo-template. A repository's own words go
+# under [default.extend-words] after this block.
+
+# typos walks past a hidden file but checks any path it is handed, which is how
+# the hook hands it .gitignore. The assembled file is a list of file extensions
+# from github/gitignore, and some three-letter TeX ones read as words.
+[type.gitignore]
+extend-glob = [".gitignore", "*.gitignore"]
+check-file = false
+
+# A generated CHANGELOG.md carries short commit hashes as link text, and typos
+# reads the letters in one as a word. A type of its own, unchecked, is typos'
+# way to leave a generated file alone.
+[type.changelog]
+extend-glob = ["CHANGELOG.md"]
+check-file = false
+
+[default.extend-words]
+Pn = "Pn"
+Ba = "Ba"

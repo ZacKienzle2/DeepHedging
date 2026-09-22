@@ -25,11 +25,13 @@ class BidAskCost:
     ask_half_spread: float
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.bid_half_spread < 0.0 or self.ask_half_spread < 0.0:
-            raise ValueError(
+            msg = (
                 "half-spreads must be non-negative, got "
                 f"bid={self.bid_half_spread} ask={self.ask_half_spread}"
             )
+            raise ValueError(msg)
 
     def __call__(self, trade: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
         """Computes the spread cost of a trade.

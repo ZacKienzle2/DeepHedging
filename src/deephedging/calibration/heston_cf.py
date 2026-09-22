@@ -4,12 +4,16 @@ The textbook Heston characteristic function takes the principal branch
 of a complex logarithm whose argument winds around the origin as the
 frequency or the maturity grows, producing discontinuities and wrong
 prices, the failure named the little Heston trap by Albrecher, Mayer,
-Schoutens, and Tistaert. The Gatheral formulation below selects the
-negative root of the discriminant, whose log argument stays in the
-right half plane on the pricing strip, so the function is continuous
-everywhere the calibrator can wander. Everything is composed from exp,
-log, sqrt, and arithmetic on complex128 tensors, so the parameters
-carry autograd for calibration gradients.
+Schoutens, and Tistaert. The formulation below keeps ``exp(-D tau)``
+and ``G = (beta - D) / (beta + D)`` under the logarithm, with the
+principal square root so that ``Re D >= 0``. Lord and Kahl (2010,
+Theorem 3.7) prove that its logarithm argument never crosses the
+negative real line anywhere in the strip of regularity, for every
+parameter set, so the principal branch is the correct one and no
+rotation count is needed. ``D`` vanishes only on the imaginary axis,
+which the COS pricer's real frequencies never reach. Everything is
+composed from exp, log, sqrt, and arithmetic on complex128 tensors, so
+the parameters carry autograd for calibration gradients.
 """
 
 import math
@@ -37,16 +41,22 @@ class HestonParams:
     rho: float
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.v0 < 0.0:
-            raise ValueError(f"v0 must be non-negative, got {self.v0}")
+            msg = f"v0 must be non-negative, got {self.v0}"
+            raise ValueError(msg)
         if self.kappa <= 0.0:
-            raise ValueError(f"kappa must be positive, got {self.kappa}")
+            msg = f"kappa must be positive, got {self.kappa}"
+            raise ValueError(msg)
         if self.theta < 0.0:
-            raise ValueError(f"theta must be non-negative, got {self.theta}")
+            msg = f"theta must be non-negative, got {self.theta}"
+            raise ValueError(msg)
         if self.xi <= 0.0:
-            raise ValueError(f"xi must be positive, got {self.xi}")
+            msg = f"xi must be positive, got {self.xi}"
+            raise ValueError(msg)
         if not -1.0 < self.rho < 1.0:
-            raise ValueError(f"rho must be in (-1, 1), got {self.rho}")
+            msg = f"rho must be in (-1, 1), got {self.rho}"
+            raise ValueError(msg)
 
     def as_tensors(self) -> tuple[torch.Tensor, ...]:
         """Returns the parameters as float64 scalar tensors.

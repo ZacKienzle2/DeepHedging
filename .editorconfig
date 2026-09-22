@@ -3,19 +3,109 @@ root = true
 [*]
 charset = utf-8
 end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
-
-[*.{json,yml,yaml,toml}]
-indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
 
 [*.md]
+# CommonMark sets list-continuation indentation, so the width inherited
+# from [*] does not apply. "unset" is the specification's own way to undo an
+# inherited pair.
+indent_size = unset
 trim_trailing_whitespace = false
+
+# CITATION.cff is YAML by the Citation File Format specification, and
+# clang-format, clang-tidy and clangd keep their configuration in YAML files
+# named without an extension, which prettier formats as YAML by name.
+[*.{yml,yaml,json,toml,cff}]
+indent_size = 2
+
+# The glob is .clang* rather than .clang-* because the hyphenated form matches
+# .clang-format and .clang-tidy and misses .clangd, which has no hyphen and is
+# YAML like the other two. editorconfig-checker reported every indented line in
+# that file as wrong because it fell through to the four-space default above.
+[.clang*]
+indent_size = 2
+
+# A Jinja template carries the indentation of the language it renders, offset by
+# whatever the surrounding template blocks need, so its own lines do not sit on
+# any single grid.
+[*.jinja]
+indent_size = unset
+
+# max_line_length is set only where a formatter reads it. prettier takes its
+# print width from here for these languages; ruff, clang-format and
+# cmake-format carry their own widths; and a linter reading a width under [*]
+# reported generated .gitignore headers, data files and a Doxyfile that no
+# formatter will ever wrap.
+[*.{js,cjs,mjs,ts,tsx,jsx,css,scss,html}]
+max_line_length = 120
 
 [Makefile]
 indent_style = tab
 
-[*.cu]
+[*.{js,cjs,mjs,ts,tsx,jsx}]
 indent_size = 2
+
+[*.{css,scss,html}]
+indent_size = 2
+
+# clang-format owns the layout of these and aligns continuation lines to the
+# construct rather than to a multiple of the indent, and cmake-format does the
+# same for CMake. editorconfig-checker reads indent_size as a rule, so the
+# formatter's own output failed it on 29 lines of one tree. "unset" leaves
+# the width to the formatter and keeps the rest of the section.
+[*.{c,cc,cpp,cxx,h,hh,hpp,hxx,cu,cuh}]
+indent_size = unset
+
+[{CMakeLists.txt,*.cmake}]
+indent_size = unset
+
+# nbformat writes a notebook at one space, and nbstripout writes it back the
+# same way, so the width is the format's, not an author's.
+[*.ipynb]
+indent_size = unset
+
+# ruff format owns Python layout and leaves a docstring's own alignment as
+# written, which editorconfig-checker would otherwise read as a wrong indent.
+[*.py]
+indent_size = unset
+
+# tex-fmt and bibtex-tidy both indent at two spaces by default, so
+# editorconfig-checker is told the width they write.
+[*.{tex,sty,cls,bib}]
+indent_size = 2
+
+# No formatter writes BibTeX style files. A style derived from abbrv.bst and
+# unsrt.bst continues a MACRO body on a line one space in, which no indent
+# width describes, and "unset" leaves the width to the file.
+[*.bst]
+indent_size = unset
+
+# tex-fmt writes CRLF on Windows and refuses LF there, so the line ending
+# of the files it formats is its own. .gitattributes stores them with LF.
+[*.{tex,sty,cls}]
+end_of_line = unset
+
+[*.rs]
+indent_size = 4
+
+[*.go]
+indent_style = tab
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[*.ps1]
+end_of_line = crlf
+
+# A lock file is written by its own resolver, nix, uv, cargo or npm, at
+# whatever width that tool uses, and an edit here is undone the next time the
+# lock is regenerated. The width is left to the file rather than asserted over
+# it, which is what editorconfig-checker reads before reporting one.
+[*.lock]
+indent_size = unset
+
+[package-lock.json]
+indent_size = unset

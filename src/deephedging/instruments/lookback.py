@@ -31,7 +31,7 @@ class LookbackCall:
         Returns:
             Payoff per path of shape ``(n_paths,)``.
         """
-        return torch.clamp(paths.max(dim=0).values - self.strike, min=0.0)
+        return torch.clamp(paths.amax(dim=0) - self.strike, min=0.0)
 
 
 @dataclass(frozen=True)
@@ -59,4 +59,4 @@ class LookbackPut:
         Returns:
             Payoff per path of shape ``(n_paths,)``.
         """
-        return torch.clamp(self.strike - paths.min(dim=0).values, min=0.0)
+        return torch.clamp(self.strike - paths.amin(dim=0), min=0.0)

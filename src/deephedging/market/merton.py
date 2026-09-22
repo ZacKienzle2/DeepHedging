@@ -8,8 +8,6 @@ import torch
 from deephedging.market.noise import NoiseSpec
 from deephedging.market.state import MarketState
 
-_MAX_JUMPS = 16
-
 
 @dataclass(frozen=True)
 class MertonSimulator:
@@ -18,10 +16,9 @@ class MertonSimulator:
     Log returns compound a Gaussian diffusion with a compensated
     compound-Poisson jump component whose marks are normal, so each step
     samples the exact transition law rather than an Euler approximation.
-    Jump counts are drawn by inverting the truncated Poisson distribution
-    function against the seeded uniform stream, because the library
-    Poisson sampler accepts no generator and would silently break the
-    exact-replay contract of the noise specification. The conditional
+    Jump counts come from ``torch.poisson`` driven by the seeded generator,
+    which replays bitwise on both devices and has no truncation, so any
+    jump intensity per step is admissible. The conditional
     jump sum given a count of ``n`` is normal with mean ``n * jump_mean``
     and variance ``n * jump_vol ** 2``, which collapses the per-jump loop
     into one Gaussian draw. The compensator keeps the price a martingale
@@ -53,22 +50,25 @@ class MertonSimulator:
     device: str = "cpu"
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.s0 <= 0.0:
-            raise ValueError(f"s0 must be positive, got {self.s0}")
+            msg = f"s0 must be positive, got {self.s0}"
+            raise ValueError(msg)
         if self.sigma < 0.0:
-            raise ValueError(f"sigma must be non-negative, got {self.sigma}")
+            msg = f"sigma must be non-negative, got {self.sigma}"
+            raise ValueError(msg)
         if self.jump_intensity < 0.0:
-            raise ValueError(f"jump_intensity must be non-negative, got {self.jump_intensity}")
+            msg = f"jump_intensity must be non-negative, got {self.jump_intensity}"
+            raise ValueError(msg)
         if self.jump_vol < 0.0:
-            raise ValueError(f"jump_vol must be non-negative, got {self.jump_vol}")
+            msg = f"jump_vol must be non-negative, got {self.jump_vol}"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
-        if self.jump_intensity * self.maturity / self.n_steps > 2.0:
-            raise ValueError(
-                "jump_intensity per step exceeds the truncated sampler's range; increase n_steps"
-            )
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)
 
     @property
     def mean_jump_size(self) -> float:
@@ -95,17 +95,9 @@ class MertonSimulator:
 
         shape = (self.n_steps, n_paths)
         z_diffusion = torch.randn(shape, dtype=self.dtype, device=self.device, generator=generator)
-        uniforms = torch.rand(shape, dtype=self.dtype, device=self.device, generator=generator)
+        rates = torch.full(shape, rate, dtype=self.dtype, device=self.device)
+        counts = torch.poisson(rates, generator=generator)
         z_jump = torch.randn(shape, dtype=self.dtype, device=self.device, generator=generator)
-
-        log_pmf = (
-            torch.arange(_MAX_JUMPS + 1, dtype=torch.float64) * math.log(max(rate, 1e-300))
-            - rate
-            - torch.lgamma(torch.arange(_MAX_JUMPS + 1, dtype=torch.float64) + 1.0)
-        )
-        cdf = torch.exp(log_pmf).cumsum(dim=0).to(self.dtype).to(self.device)
-        counts = torch.searchsorted(cdf, uniforms.reshape(-1).contiguous()).reshape(shape)
-        counts = torch.clamp(counts, max=_MAX_JUMPS).to(self.dtype)
 
         jump_sum = self.jump_mean * counts + self.jump_vol * torch.sqrt(counts) * z_jump
         increments = drift + diffusion * z_diffusion + jump_sum

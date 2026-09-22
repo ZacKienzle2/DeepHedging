@@ -41,9 +41,9 @@ def test_closed_form_rejects_out_of_scope() -> None:
     heston = HestonSimulator(
         s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=1.0, n_steps=10
     )
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="closed form requires GBMSimulator"):
         BlackScholesPricer().price(EuropeanCall(strike=100.0), heston)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="no closed form for UpAndOutCall"):
         BlackScholesPricer().price(UpAndOutCall(strike=100.0, barrier=120.0), _gbm())
 
 
@@ -70,7 +70,7 @@ def test_nonzero_rate_backends_agree() -> None:
 
 def test_closed_form_rejects_drift_mismatch() -> None:
     drifted = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=10, mu=0.05)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"risk-neutral pricing needs simulator drift 0\.0"):
         BlackScholesPricer(rate=0.0).price(EuropeanCall(strike=100.0), drifted)
 
 

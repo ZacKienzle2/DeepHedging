@@ -9,11 +9,20 @@ never leak into its input.
 """
 
 from dataclasses import dataclass
+from functools import cache
 from typing import Protocol, runtime_checkable
 
 import torch
 
 from deephedging.market.state import MarketState
+
+
+@cache
+def _level_column(
+    codes: tuple[float, ...], n_paths: int, dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
+    column = torch.tensor(codes, dtype=dtype, device=device).repeat(n_paths // len(codes))
+    return column.unsqueeze(-1)
 
 
 @runtime_checkable
@@ -153,10 +162,11 @@ class MultiAssetFeatures:
         """
         log_moneyness = state.log_relative(t)
         if position.dim() != 2 or position.shape[-1] != self.n_assets:
-            raise ValueError(
+            msg = (
                 f"position must have shape (n_paths, {self.n_assets}); the policy "
                 f"output width must match n_assets, got {tuple(position.shape)}"
             )
+            raise ValueError(msg)
         n_paths = log_moneyness.shape[0]
         return torch.cat((log_moneyness, tau.expand(n_paths, 1), position), dim=-1)
 
@@ -190,9 +200,6 @@ class VarianceFeatures:
 
         Returns:
             Features of shape ``(n_paths, 4)``.
-
-        Raises:
-            KeyError: If the state carries no ``variance`` channel.
         """
         log_moneyness = state.log_relative(t)
         n_paths = log_moneyness.shape[0]
@@ -205,3 +212,45 @@ class VarianceFeatures:
             ),
             dim=-1,
         )
+
+
+@dataclass(frozen=True)
+class LevelFeatures:
+    """Another feature map's observation plus the path's risk-level code.
+
+    Path ``i`` carries ``codes[i mod K]``, matching the interleaved level
+    assignment of :class:`~deephedging.risk.multi_level.MultiLevelRisk`, so
+    the policy sees which risk level it is hedging for, as in Murray et al.
+    (2022, Section 2.3). A code such as the logarithm of the risk aversion
+    places the levels on the scale the paper samples them on.
+
+    Attributes:
+        base: Feature map whose columns come first.
+        codes: One code per level, in level order.
+    """
+
+    base: FeatureMap
+    codes: tuple[float, ...]
+
+    @property
+    def n_features(self) -> int:
+        """Width of the produced feature vector."""
+        return self.base.n_features + 1
+
+    def __call__(
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
+    ) -> torch.Tensor:
+        """Computes the base features and appends the level code.
+
+        Args:
+            state: Simulated market state.
+            t: Index of the current rebalancing date.
+            tau: Scalar tensor, normalised time to maturity at ``t``.
+            position: Position held entering ``t``, shape ``(n_paths,)``.
+
+        Returns:
+            Features of shape ``(n_paths, base.n_features + 1)``.
+        """
+        features = self.base(state, t, tau, position)
+        column = _level_column(self.codes, features.shape[0], features.dtype, features.device)
+        return torch.cat((features, column), dim=-1)

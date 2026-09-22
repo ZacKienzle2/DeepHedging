@@ -62,7 +62,8 @@ def fit_slope(points: list[tuple[float, float]]) -> tuple[float, float, float]:
     """
     usable = [(math.log(c), math.log(w)) for c, w in points if w > 0.0]
     if len(usable) < 3:
-        raise ValueError(f"need at least 3 positive widths, got {len(usable)}")
+        msg = f"need at least 3 positive widths, got {len(usable)}"
+        raise ValueError(msg)
     n = len(usable)
     mean_x = sum(x for x, _ in usable) / n
     mean_y = sum(y for _, y in usable) / n
@@ -87,7 +88,8 @@ def main() -> None:
         alpha = setup.get("alpha")
         if probe is None or not isinstance(cost_rate, float) or cost_rate == 0.0:
             continue
-        assert isinstance(probe, dict) and isinstance(alpha, float)
+        assert isinstance(probe, dict)
+        assert isinstance(alpha, float)
         for threshold in HOLD_THRESHOLDS:
             width = band_width(probe["inventory"], probe["response"], threshold)
             probes[(alpha, threshold)].append((cost_rate, width))

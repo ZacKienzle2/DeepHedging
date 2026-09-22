@@ -29,7 +29,7 @@ def test_round_trip_preserves_everything(tmp_path: Path) -> None:
     assert loaded[0].duration_seconds == 1.5
 
 
-def test_provenance_identifies_the_build(tmp_path: Path) -> None:
+def test_provenance_identifies_the_build() -> None:
     record = _record("prov")
     for key in ("commit", "torch", "cuda", "device", "platform", "created_utc"):
         assert record.provenance[key]

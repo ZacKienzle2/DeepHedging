@@ -5,13 +5,13 @@ import math
 import pytest
 import torch
 
-from deephedging.evaluation import merton_call_price
+from deephedging.evaluation import bs_call_price, merton_call_price
 from deephedging.instruments import EuropeanCall
 from deephedging.market import MertonSimulator, NoiseSpec
 from deephedging.pricing import MonteCarloPricer
 
 
-def _simulator(**overrides: float | int) -> MertonSimulator:
+def _simulator(**overrides: float) -> MertonSimulator:
     params: dict[str, float | int] = {
         "s0": 100.0,
         "sigma": 0.2,
@@ -94,7 +94,6 @@ def test_monte_carlo_matches_closed_form() -> None:
 
 
 def test_closed_form_zero_intensity_is_black_scholes() -> None:
-    from deephedging.evaluation import bs_call_price
 
     merton = float(
         merton_call_price(
@@ -112,9 +111,12 @@ def test_closed_form_zero_intensity_is_black_scholes() -> None:
 
 
 def test_invalid_parameters_raise() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="jump_intensity must be non-negative"):
         _simulator(jump_intensity=-1.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="jump_vol must be non-negative"):
         _simulator(jump_vol=-0.1)
-    with pytest.raises(ValueError):
-        _simulator(jump_intensity=200.0, n_steps=10)
+
+
+def test_many_jumps_per_step_keep_the_poisson_mean() -> None:
+    state = _simulator(jump_intensity=200.0, n_steps=10).simulate(4096, noise=NoiseSpec(seed=3))
+    assert abs(float(state.aux["jumps"][-1].mean()) - 200.0) < 2.0

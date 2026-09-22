@@ -42,5 +42,5 @@ def test_barrier_payoff_never_exceeds_vanilla() -> None:
 
 
 def test_barrier_below_strike_rejected() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="barrier must exceed strike"):
         UpAndOutCall(strike=100.0, barrier=90.0)

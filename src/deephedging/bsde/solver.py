@@ -6,6 +6,12 @@ minimises the terminal mismatch ``E|Y_T - g(X_T)|^2``. For a generator
 uniformly Lipschitz in ``(y, z)`` the achieved loss is an a posteriori
 bound on the ``(Y, Z)`` error up to a constant ``C ~ exp(c L^2 T)``, so
 the final loss is reported alongside the price.
+
+The forward state does not depend on ``Y``, and ``Z`` reads only time and
+the forward state, so the whole forward path and every ``Z`` evaluation
+run as whole-grid operations, one network call over all dates. Only the
+``Y`` recursion, which the generator couples to its own past, stays a loop
+over dates, and it is elementwise.
 """
 
 import math
@@ -16,6 +22,7 @@ from torch import nn
 
 from deephedging.bsde.problem import BSDEProblem
 from deephedging.market.noise import NoiseSpec
+from deephedging.networks import mlp
 
 
 class DeepBSDESolver(nn.Module):
@@ -41,14 +48,7 @@ class DeepBSDESolver(nn.Module):
         super().__init__()
         self.dim = dim
         self.y0 = nn.Parameter(torch.zeros(()))
-        layers: list[nn.Module] = []
-        width = dim + 1
-        for size in hidden_sizes:
-            layers.append(nn.Linear(width, size))
-            layers.append(nn.SiLU())
-            width = size
-        layers.append(nn.Linear(width, dim))
-        self.z_net = nn.Sequential(*layers)
+        self.z_net = mlp(dim + 1, hidden_sizes, dim)
 
     def forward(
         self, problem: BSDEProblem, n_paths: int, noise: NoiseSpec | None = None
@@ -75,18 +75,17 @@ class DeepBSDESolver(nn.Module):
             generator=generator,
         ).mul_(sqrt_dt)
         times = torch.arange(problem.n_steps, dtype=dtype, device=device) * dt
-        scaled_times = times / problem.maturity
-        log_x = torch.zeros((n_paths, problem.dim), dtype=dtype, device=device)
-        y = self.y0.expand(n_paths)
         drift = (problem.mu - 0.5 * problem.sigma**2) * dt
+        log_path = torch.cumsum(drift + problem.sigma * dw, dim=0)
+        log_x = torch.cat((torch.zeros_like(log_path[:1]), log_path[:-1]))
+        x = problem.x0 * torch.exp(log_x)
+        scaled_times = (times / problem.maturity).view(-1, 1, 1).expand(-1, n_paths, 1)
+        z = self.z_net(torch.cat((scaled_times, log_x), dim=-1))
+        martingale = torch.linalg.vecdot(z, dw)
+        y = self.y0.expand(n_paths)
         for k in range(problem.n_steps):
-            t_col = scaled_times[k].expand(n_paths, 1)
-            x = problem.x0 * torch.exp(log_x)
-            z = self.z_net(torch.cat((t_col, log_x), dim=1))
-            f = problem.generator(times[k], x, y, z)
-            y = y - f * dt + (z * dw[k]).sum(dim=1)
-            log_x = log_x + drift + problem.sigma * dw[k]
-        terminal = problem.terminal(problem.x0 * torch.exp(log_x))
+            y = y - problem.generator(times[k], x[k], y, z[k]) * dt + martingale[k]
+        terminal = problem.terminal(problem.x0 * torch.exp(log_path[-1]))
         return y, terminal
 
 
@@ -151,7 +150,8 @@ def train_bsde(
         ValueError: If the solver and problem dimensions disagree.
     """
     if solver.dim != problem.dim:
-        raise ValueError(f"solver dim {solver.dim} != problem dim {problem.dim}")
+        msg = f"solver dim {solver.dim} != problem dim {problem.dim}"
+        raise ValueError(msg)
     base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
 
     def batch_noise(index: int) -> NoiseSpec | None:
@@ -165,12 +165,13 @@ def train_bsde(
         [
             {"params": list(solver.z_net.parameters()), "lr": config.lr},
             {"params": [solver.y0], "lr": y0_lr},
-        ]
+        ],
+        fused=solver.y0.is_cuda,
     )
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
         y_terminal, target = solver(problem, config.batch_paths, noise=batch_noise(iteration + 1))
-        loss = torch.mean((y_terminal - target) ** 2)
+        loss = nn.functional.mse_loss(y_terminal, target)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()

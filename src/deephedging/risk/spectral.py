@@ -68,7 +68,8 @@ class SpectralRisk(RiskMeasure):
             ValueError: If ``risk_aversion`` is not positive.
         """
         if risk_aversion <= 0.0:
-            raise ValueError(f"risk_aversion must be positive, got {risk_aversion}")
+            msg = f"risk_aversion must be positive, got {risk_aversion}"
+            raise ValueError(msg)
         k = risk_aversion
         normaliser = math.expm1(k)
 
@@ -97,7 +98,8 @@ class SpectralRisk(RiskMeasure):
             ValueError: If ``alpha`` is outside ``(0, 1)``.
         """
         if not 0.0 < alpha < 1.0:
-            raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+            msg = f"alpha must be in (0, 1), got {alpha}"
+            raise ValueError(msg)
 
         def distortion(u: torch.Tensor) -> torch.Tensor:
             return torch.clamp((u - alpha) / (1.0 - alpha), min=0.0, max=1.0)
@@ -122,7 +124,8 @@ class SpectralRisk(RiskMeasure):
             ValueError: If ``loss`` is not one-dimensional.
         """
         if loss.dim() != 1:
-            raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
+            msg = f"loss must be 1-dimensional, got shape {tuple(loss.shape)}"
+            raise ValueError(msg)
         order = torch.argsort(loss)
         ordered_loss = loss[order]
         if weights is None:

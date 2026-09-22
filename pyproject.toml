@@ -7,20 +7,27 @@ name = "deephedging"
 version = "0.1.0"
 description = "Deep hedging research framework: neural hedging policies under market frictions"
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
-    "torch>=2.2,<3",
-]
+requires-python = ">=3.12"
+dependencies = ["mpmath>=1.3", "torch>=2.2,<3"]
 
 [project.optional-dependencies]
+notebook = ["matplotlib>=3.8", "ipykernel>=6.29,<10"]
+
+[dependency-groups]
 dev = [
-    "pytest>=8.0",
-    "ruff>=0.4",
-    "pyright>=1.1.350",
-]
-notebook = [
-    "matplotlib>=3.8",
-    "ipykernel>=6.29,<10",
+  "pytest>=9",
+  "hypothesis[cli]>=6",
+  "pytest-benchmark>=5",
+  "nox>=2025",
+  "pytest-randomly>=3",
+  "pytest-timeout>=2",
+  "pytest-testmon>=2",
+  "pytest-cov>=6",
+  "pyperf>=2.10",
+  "deptry>=0.25",
+  "tomli-w>=1.2",
+  "ninja>=1.13.0",
+  "numpy>=2",
 ]
 
 [[tool.uv.index]]
@@ -35,50 +42,122 @@ explicit = true
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cu130", marker = "sys_platform == 'win32'" },
-    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+  { index = "pytorch-cu130", marker = "sys_platform == 'win32'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deephedging"]
 
 [tool.ruff]
-line-length = 100
-src = ["src", "tests"]
-target-version = "py311"
+show-fixes = true
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+extend-select = [
+  "ARG",
+  "B",
+  "BLE",
+  "C4",
+  "D",
+  "DTZ",
+  "EM",
+  "EXE",
+  "FA",
+  "FLY",
+  "FURB",
+  "G",
+  "I",
+  "N",
+  "ICN",
+  "LOG",
+  "PIE",
+  "NPY",
+  "PD",
+  "PERF",
+  "PGH",
+  "PL",
+  "PT",
+  "PTH",
+  "PYI",
+  "Q",
+  "RET",
+  "RSE",
+  "RUF",
+  "SIM",
+  "SLOT",
+  "T10",
+  "T20",
+  "TC",
+  "TRY",
+  "UP",
+  "YTT",
+]
+ignore = ["PLR09", "PLR2004", "TRY003"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D100", "D103", "T20"]
+"src/**" = ["TC003"]
+"experiments/**" = ["T20"]
+"src/deephedging/market/cuda.py" = ["PLC0415"]
+"*.ipynb" = ["T20"]
+
+[tool.repo-review.ignore]
+MY100 = "mypy.ini holds the configuration, and mypy reads it ahead of pyproject.toml"
+PC170 = "pygrep-hooks checks reStructuredText, which no repository here writes"
+PC140 = "mypy runs as a local hook through uv, where torch resolves, and pyright gates beside it"
+
+[tool.pytest]
+minversion = "9"
+strict = true
+addopts = ["-ra", "--import-mode=importlib"]
+filterwarnings = [
+  "error",
+  "ignore:_get_vc_env is private:UserWarning",
+  "ignore:`torch.jit.script_method` is deprecated:DeprecationWarning",
+]
+log_cli_level = "INFO"
+log_level = "INFO"
+testpaths = ["tests"]
+timeout = "300"
+markers = [
+  "slow: training-loop and large Monte Carlo tests (tens of seconds)",
+  "gpu: requires a CUDA device",
+]
+
+[tool.coverage]
+run.source = ["deephedging"]
+run.branch = true
+report.show_missing = true
+report.exclude_also = [
+  'if typing.TYPE_CHECKING:',
+  'if TYPE_CHECKING:',
+  'raise NotImplementedError',
+  '@(abc\.)?abstractmethod',
+  '\.\.\.',
+]
+
+[tool.pydoclint]
+style = "google"
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-yield-types = false
+allow-init-docstring = true
+check-class-attributes = false
+
+[tool.deptry]
+known_first_party = ["deephedging", "_harness"]
+extend_exclude = ["noxfile.py"]
+per_rule_ignores = { DEP002 = ["ipykernel"] }
 
 [tool.pyright]
 include = ["src", "tests"]
+venvPath = "."
+venv = ".venv"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
 reportUnknownMemberType = false
 reportUnknownVariableType = false
 reportUnknownArgumentType = false
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-markers = [
-    "slow: training-loop and large Monte Carlo tests (tens of seconds)",
-    "gpu: requires a CUDA device",
-]
-
-[tool.coverage.run]
-source = ["deephedging"]
-branch = true
-
-[tool.coverage.report]
-show_missing = true
-exclude_also = [
-    "if TYPE_CHECKING:",
-    "raise NotImplementedError",
-    "@(abc\\.)?abstractmethod",
-    "\\.\\.\\.",
-]
-
-[dependency-groups]
-dev = [
-    "ninja>=1.13.0",
-]
