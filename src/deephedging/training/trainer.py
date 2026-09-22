@@ -185,6 +185,77 @@ def _importance_weights(state: MarketState) -> torch.Tensor | None:
     return torch.exp(log_weight.to(torch.float64))
 
 
+def _optimizer(
+    config: TrainConfig,
+    policy_params: list[torch.nn.Parameter],
+    risk_params: list[torch.nn.Parameter],
+    device: torch.device,
+) -> torch.optim.Adam:
+    """Builds Adam over the policy and risk parameter groups.
+
+    Fused on CUDA, and capturable with device-tensor learning rates when the
+    iteration is captured, so a replayed step reads the scheduler's rate.
+
+    Args:
+        config: Training hyperparameters.
+        policy_params: Parameters of the hedging policy.
+        risk_params: Parameters of the risk measure, possibly empty.
+        device: Device holding the parameters.
+
+    Returns:
+        The optimiser.
+    """
+
+    def rate(value: float) -> float | torch.Tensor:
+        return torch.tensor(value, device=device) if config.graph_episode else value
+
+    groups: list[dict[str, object]] = [{"params": policy_params, "lr": rate(config.lr)}]
+    if risk_params:
+        risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
+        groups.append({"params": risk_params, "lr": rate(risk_lr)})
+    return torch.optim.Adam(groups, fused=device.type == "cuda", capturable=config.graph_episode)
+
+
+def _schedule(
+    config: TrainConfig, optimizer: torch.optim.Optimizer
+) -> torch.optim.lr_scheduler.LRScheduler | None:
+    """Builds the configured learning-rate schedule, if any.
+
+    Args:
+        config: Training hyperparameters.
+        optimizer: The optimiser whose rates the schedule decays.
+
+    Returns:
+        The schedule, or None for a constant rate.
+    """
+    total = max(1, config.n_iterations)
+    if config.lr_schedule == "cosine":
+        return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total)
+    if config.lr_schedule == "linear":
+        return torch.optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=1.0, end_factor=1e-3, total_iters=total
+        )
+    return None
+
+
+def _warn_if_capture_crowds(device: torch.device) -> None:
+    """Warns when the capture pool leaves too little device memory free.
+
+    Args:
+        device: The CUDA device the graph was captured on.
+    """
+    reserved = torch.cuda.memory_reserved(device)
+    capacity = torch.cuda.get_device_properties(device).total_memory
+    headroom = 0.7 if os.name == "nt" else 0.8
+    if reserved > headroom * capacity:
+        warnings.warn(
+            f"graph capture reserves {reserved / 2**30:.1f}GiB of "
+            f"{capacity / 2**30:.1f}GiB; batches beyond physical memory "
+            "page through the host and collapse throughput",
+            stacklevel=3,
+        )
+
+
 def _capture(
     iteration: Callable[[], torch.Tensor],
     parameters: Sequence[torch.Tensor],
@@ -284,30 +355,11 @@ def train(
         noise = base_noise.child(index) if base_noise is not None else None
         return simulator.simulate(config.batch_paths, noise=noise).to(device)
 
-    def rate(value: float) -> float | torch.Tensor:
-        return torch.tensor(value, device=device) if config.graph_episode else value
-
     policy_params = list(policy.parameters())
     risk_params = list(risk_measure.parameters())
-    param_groups: list[dict[str, object]] = [{"params": policy_params, "lr": rate(config.lr)}]
-    if risk_params:
-        risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
-        param_groups.append({"params": risk_params, "lr": rate(risk_lr)})
-    optimizer = torch.optim.Adam(
-        param_groups,
-        fused=device.type == "cuda",
-        capturable=config.graph_episode,
-    )
+    optimizer = _optimizer(config, policy_params, risk_params, device)
+    scheduler = _schedule(config, optimizer)
     clip_params = policy_params + risk_params
-    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
-    if config.lr_schedule == "cosine":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=max(1, config.n_iterations)
-        )
-    elif config.lr_schedule == "linear":
-        scheduler = torch.optim.lr_scheduler.LinearLR(
-            optimizer, start_factor=1.0, end_factor=1e-3, total_iters=max(1, config.n_iterations)
-        )
     warmup_state = batch_state(0)
     with torch.no_grad():
         warmup_pnl = hedge_pnl(
@@ -381,16 +433,7 @@ def train(
         graph, static_loss = _capture(captured, clip_params, optimizer)
         if base_noise is not None:
             offset.fill_(base_noise.child(1).stream << 32)
-        reserved = torch.cuda.memory_reserved(device)
-        capacity = torch.cuda.get_device_properties(device).total_memory
-        headroom = 0.7 if os.name == "nt" else 0.8
-        if reserved > headroom * capacity:
-            warnings.warn(
-                f"graph capture reserves {reserved / 2**30:.1f}GiB of "
-                f"{capacity / 2**30:.1f}GiB; batches beyond physical memory "
-                "page through the host and collapse throughput",
-                stacklevel=2,
-            )
+        _warn_if_capture_crowds(device)
 
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
