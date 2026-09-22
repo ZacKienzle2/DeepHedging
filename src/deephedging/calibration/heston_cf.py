@@ -4,12 +4,16 @@ The textbook Heston characteristic function takes the principal branch
 of a complex logarithm whose argument winds around the origin as the
 frequency or the maturity grows, producing discontinuities and wrong
 prices, the failure named the little Heston trap by Albrecher, Mayer,
-Schoutens, and Tistaert. The Gatheral formulation below selects the
-negative root of the discriminant, whose log argument stays in the
-right half plane on the pricing strip, so the function is continuous
-everywhere the calibrator can wander. Everything is composed from exp,
-log, sqrt, and arithmetic on complex128 tensors, so the parameters
-carry autograd for calibration gradients.
+Schoutens, and Tistaert. The formulation below keeps ``exp(-D tau)``
+and ``G = (beta - D) / (beta + D)`` under the logarithm, with the
+principal square root so that ``Re D >= 0``. Lord and Kahl (2010,
+Theorem 3.7) prove that its logarithm argument never crosses the
+negative real line anywhere in the strip of regularity, for every
+parameter set, so the principal branch is the correct one and no
+rotation count is needed. ``D`` vanishes only on the imaginary axis,
+which the COS pricer's real frequencies never reach. Everything is
+composed from exp, log, sqrt, and arithmetic on complex128 tensors, so
+the parameters carry autograd for calibration gradients.
 """
 
 import math
