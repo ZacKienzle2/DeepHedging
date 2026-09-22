@@ -1,0 +1,35 @@
+name: OSV-Scanner
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "13 6 * * 3"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: osv-scanner-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan dependencies via OSV
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    # OSV owns dependency advisories, so the scan runs everywhere.
+    # Code scanning takes the report from public repositories only.
+    with:
+      upload-sarif: ${{ github.event.repository.private == false }}
+      scan-args: |-
+        --recursive
+        --skip-git
+        ./
+      results-file-name: osv-results.sarif
+    permissions:
+      contents: read
+      security-events: write
+      actions: read

@@ -1,0 +1,36 @@
+name: Auto-assign
+
+on:
+  # pull_request rather than pull_request_target. zizmor's remediation is to
+  # replace the latter "unless you absolutely need repository write
+  # permissions", which a pull request from a fork would; release-drafter's own
+  # example uses pull_request and reserves the other for forks, and labeler
+  # says the same. No repository here takes pull requests from forks.
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: auto-assign-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  assign:
+    name: Assign reviewers and author
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Assign
+        uses: kentaro-m/auto-assign-action@0a2c53d3721e4c5cfcce6afd4014aecc337979f6 # v2.0.2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/auto_assign.yml

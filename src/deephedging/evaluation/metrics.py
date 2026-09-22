@@ -30,7 +30,8 @@ def expected_shortfall(
         ValueError: If ``alpha`` is outside (0, 1).
     """
     if not 0.0 < alpha < 1.0:
-        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+        msg = f"alpha must be in (0, 1), got {alpha}"
+        raise ValueError(msg)
     loss = -pnl
     if weights is None:
         var = torch.quantile(loss, alpha)

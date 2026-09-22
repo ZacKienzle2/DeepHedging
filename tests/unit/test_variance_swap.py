@@ -102,7 +102,7 @@ def test_swap_mean_is_stationary_at_long_run_variance() -> None:
 
 
 def test_rejects_swap_maturity_inside_horizon() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="vs_maturity must exceed the hedging horizon"):
         HestonVarianceSwapSimulator(heston=_heston(maturity=1.0), vs_maturity=1.0)
 
 
@@ -115,7 +115,7 @@ def test_single_asset_payoff_reads_one_column() -> None:
 
 
 def test_single_asset_payoff_rejects_negative_index() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="asset must be non-negative"):
         SingleAssetPayoff(inner=EuropeanCall(strike=100.0), asset=-1)
 
 
@@ -128,12 +128,12 @@ def test_per_asset_cost_rates_apply_on_the_trailing_axis() -> None:
 
 
 def test_per_asset_cost_validates_rates_and_width() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="rates must contain at least one asset"):
         PerAssetProportionalCost(rates=())
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="rates must be non-negative"):
         PerAssetProportionalCost(rates=(1e-3, -1.0))
     cost = PerAssetProportionalCost(rates=(1e-3,))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="trade has 2 assets, cost model has 1 rates"):
         cost(torch.zeros((4, 2)), torch.ones((4, 2)))
 
 

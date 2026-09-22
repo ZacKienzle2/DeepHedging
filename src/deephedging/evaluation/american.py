@@ -81,7 +81,8 @@ def lsm_american_put(
         ValueError: If the simulator drift disagrees with the rate.
     """
     if simulator.mu != rate:
-        raise ValueError(f"risk-neutral pricing needs simulator drift {rate}, got {simulator.mu}")
+        msg = f"risk-neutral pricing needs simulator drift {rate}, got {simulator.mu}"
+        raise ValueError(msg)
     state = simulator.simulate(n_paths, noise=NoiseSpec(seed=seed))
     paths = state.spot.to(torch.float64)
     n_steps = state.n_steps

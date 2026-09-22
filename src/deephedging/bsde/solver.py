@@ -151,7 +151,8 @@ def train_bsde(
         ValueError: If the solver and problem dimensions disagree.
     """
     if solver.dim != problem.dim:
-        raise ValueError(f"solver dim {solver.dim} != problem dim {problem.dim}")
+        msg = f"solver dim {solver.dim} != problem dim {problem.dim}"
+        raise ValueError(msg)
     base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
 
     def batch_noise(index: int) -> NoiseSpec | None:

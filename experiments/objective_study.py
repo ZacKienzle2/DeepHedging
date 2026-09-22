@@ -64,7 +64,8 @@ def make_objective(name: str) -> RiskMeasure:
         return CVaR(alpha=float(name[4:]))
     if name.startswith("entropic"):
         return Entropic(risk_aversion=float(name[8:]))
-    raise ValueError(f"unknown objective {name}")
+    msg = f"unknown objective {name}"
+    raise ValueError(msg)
 
 
 def main() -> None:

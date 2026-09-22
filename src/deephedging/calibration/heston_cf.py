@@ -37,16 +37,22 @@ class HestonParams:
     rho: float
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.v0 < 0.0:
-            raise ValueError(f"v0 must be non-negative, got {self.v0}")
+            msg = f"v0 must be non-negative, got {self.v0}"
+            raise ValueError(msg)
         if self.kappa <= 0.0:
-            raise ValueError(f"kappa must be positive, got {self.kappa}")
+            msg = f"kappa must be positive, got {self.kappa}"
+            raise ValueError(msg)
         if self.theta < 0.0:
-            raise ValueError(f"theta must be non-negative, got {self.theta}")
+            msg = f"theta must be non-negative, got {self.theta}"
+            raise ValueError(msg)
         if self.xi <= 0.0:
-            raise ValueError(f"xi must be positive, got {self.xi}")
+            msg = f"xi must be positive, got {self.xi}"
+            raise ValueError(msg)
         if not -1.0 < self.rho < 1.0:
-            raise ValueError(f"rho must be in (-1, 1), got {self.rho}")
+            msg = f"rho must be in (-1, 1), got {self.rho}"
+            raise ValueError(msg)
 
     def as_tensors(self) -> tuple[torch.Tensor, ...]:
         """Returns the parameters as float64 scalar tensors.

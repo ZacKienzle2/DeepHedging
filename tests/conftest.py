@@ -4,11 +4,10 @@ import pytest
 import torch
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """Skips GPU-marked tests when no CUDA device is available.
 
     Args:
-        config: The pytest configuration object.
         items: Collected test items.
     """
     if torch.cuda.is_available():

@@ -75,7 +75,8 @@ def bootstrap_metric(
         ValueError: If ``pnl`` is not one-dimensional, ``confidence`` is
             outside ``(0, 1)``, or ``n_resamples`` is not positive.
     """
-    _validate_sample(pnl, confidence, n_resamples)
+    if (msg := _sample_error(pnl, confidence, n_resamples)) is not None:
+        raise ValueError(msg)
     n_paths = pnl.shape[0]
     generator = torch.Generator(device=pnl.device).manual_seed(seed)
     estimates = pnl.new_empty(n_resamples)
@@ -125,12 +126,14 @@ def paired_bootstrap(
             ``confidence`` is outside ``(0, 1)``, or ``n_resamples`` is not
             positive.
     """
-    _validate_sample(first_pnl, confidence, n_resamples)
+    if (msg := _sample_error(first_pnl, confidence, n_resamples)) is not None:
+        raise ValueError(msg)
     if first_pnl.shape != second_pnl.shape:
-        raise ValueError(
+        msg = (
             f"paired samples must match in shape, got {tuple(first_pnl.shape)} "
             f"and {tuple(second_pnl.shape)}"
         )
+        raise ValueError(msg)
     n_paths = first_pnl.shape[0]
     generator = torch.Generator(device=first_pnl.device).manual_seed(seed)
     differences = first_pnl.new_empty(n_resamples)
@@ -147,10 +150,11 @@ def paired_bootstrap(
     )
 
 
-def _validate_sample(pnl: torch.Tensor, confidence: float, n_resamples: int) -> None:
+def _sample_error(pnl: torch.Tensor, confidence: float, n_resamples: int) -> str | None:
     if pnl.dim() != 1:
-        raise ValueError(f"pnl must be 1-dimensional, got shape {tuple(pnl.shape)}")
+        return f"pnl must be 1-dimensional, got shape {tuple(pnl.shape)}"
     if not 0.0 < confidence < 1.0:
-        raise ValueError(f"confidence must be in (0, 1), got {confidence}")
+        return f"confidence must be in (0, 1), got {confidence}"
     if n_resamples <= 0:
-        raise ValueError(f"n_resamples must be positive, got {n_resamples}")
+        return f"n_resamples must be positive, got {n_resamples}"
+    return None

@@ -9,9 +9,11 @@ def _d1(
     spot: torch.Tensor, strike: float, sigma: float, tau: torch.Tensor, rate: float
 ) -> torch.Tensor:
     if sigma <= 0.0:
-        raise ValueError(f"sigma must be positive, got {sigma}")
+        msg = f"sigma must be positive, got {sigma}"
+        raise ValueError(msg)
     if bool(torch.any(tau <= 0.0)):
-        raise ValueError("tau must be positive everywhere")
+        msg = "tau must be positive everywhere"
+        raise ValueError(msg)
     return (torch.log(spot / strike) + (rate + 0.5 * sigma**2) * tau) / (sigma * torch.sqrt(tau))
 
 

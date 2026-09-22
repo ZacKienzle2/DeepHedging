@@ -85,14 +85,18 @@ def dupire_surface(
         ValueError: If the grids are too small or the strikes non-uniform.
     """
     if taus.shape[0] < 3:
-        raise ValueError(f"need at least three maturities, got {taus.shape[0]}")
+        msg = f"need at least three maturities, got {taus.shape[0]}"
+        raise ValueError(msg)
     if bool((taus.diff() <= 0.0).any()):
-        raise ValueError("taus must be strictly increasing")
+        msg = "taus must be strictly increasing"
+        raise ValueError(msg)
     if strikes.shape[0] < 5:
-        raise ValueError(f"need at least five strikes, got {strikes.shape[0]}")
+        msg = f"need at least five strikes, got {strikes.shape[0]}"
+        raise ValueError(msg)
     spacing = strikes.diff()
     if not torch.allclose(spacing, spacing[0].expand_as(spacing), atol=1e-9):
-        raise ValueError("strikes must be uniformly spaced")
+        msg = "strikes must be uniformly spaced"
+        raise ValueError(msg)
     strike_step = float(spacing[0])
 
     tensors = params.as_tensors()

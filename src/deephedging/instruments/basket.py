@@ -18,8 +18,10 @@ class BasketCall:
     weights: tuple[float, ...]
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if not self.weights:
-            raise ValueError("weights must contain at least one asset")
+            msg = "weights must contain at least one asset"
+            raise ValueError(msg)
 
     def __call__(self, paths: torch.Tensor) -> torch.Tensor:
         """Computes the basket call payoff from the terminal prices.

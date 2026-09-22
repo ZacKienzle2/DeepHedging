@@ -38,7 +38,8 @@ class MeanVariance(RiskMeasure):
         """
         super().__init__()
         if risk_aversion < 0.0:
-            raise ValueError(f"risk_aversion must be non-negative, got {risk_aversion}")
+            msg = f"risk_aversion must be non-negative, got {risk_aversion}"
+            raise ValueError(msg)
         self.risk_aversion = risk_aversion
         self.downside = downside
 
@@ -58,7 +59,8 @@ class MeanVariance(RiskMeasure):
             ValueError: If ``loss`` is not one-dimensional.
         """
         if loss.dim() != 1:
-            raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
+            msg = f"loss must be 1-dimensional, got shape {tuple(loss.shape)}"
+            raise ValueError(msg)
         if weights is None:
             mean = loss.mean()
             deviation = loss - mean

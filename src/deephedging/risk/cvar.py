@@ -34,7 +34,8 @@ class CVaR(RiskMeasure):
         """
         super().__init__()
         if not 0.0 < alpha < 1.0:
-            raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+            msg = f"alpha must be in (0, 1), got {alpha}"
+            raise ValueError(msg)
         self.alpha = alpha
         self.threshold = nn.Parameter(torch.zeros(()))
 
@@ -82,7 +83,8 @@ class CVaR(RiskMeasure):
             ValueError: If ``loss`` is not one-dimensional.
         """
         if loss.dim() != 1:
-            raise ValueError(f"loss must be 1-dimensional, got shape {tuple(loss.shape)}")
+            msg = f"loss must be 1-dimensional, got shape {tuple(loss.shape)}"
+            raise ValueError(msg)
         excess = torch.relu(loss - self.threshold)
         if weights is not None:
             excess = excess * weights

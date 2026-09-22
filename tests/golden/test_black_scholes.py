@@ -3,6 +3,8 @@
 Reference values are analytic, not simulated, so tolerances are tight.
 """
 
+import math
+
 import torch
 
 from deephedging.evaluation import bs_call_delta, bs_call_price, bs_put_price
@@ -28,7 +30,6 @@ def test_put_call_parity() -> None:
     strike, sigma, tau, rate = 100.0, 0.25, 0.7, 0.03
     call = bs_call_price(spots, strike, sigma, tau, rate)
     put = bs_put_price(spots, strike, sigma, tau, rate)
-    import math
 
     forward = spots - strike * math.exp(-rate * tau)
     assert torch.allclose(call - put, forward, atol=1e-10)

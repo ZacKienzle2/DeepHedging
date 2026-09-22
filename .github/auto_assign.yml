@@ -1,0 +1,11 @@
+addReviewers: true
+addAssignees: author
+
+reviewers:
+  - ZacKienzle2
+
+numberOfReviewers: 1
+
+skipKeywords:
+  - "work-in-progress"
+  - "wip"

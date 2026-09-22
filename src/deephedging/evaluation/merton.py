@@ -45,7 +45,8 @@ def merton_call_price(
             term without a defined Black-Scholes price.
     """
     if sigma <= 0.0 and jump_vol <= 0.0:
-        raise ValueError("sigma and jump_vol cannot both be zero")
+        msg = "sigma and jump_vol cannot both be zero"
+        raise ValueError(msg)
     mean_jump_size = math.exp(jump_mean + 0.5 * jump_vol**2) - 1.0
     total = torch.zeros((), dtype=torch.float64)
     log_weight_base = -jump_intensity * tau

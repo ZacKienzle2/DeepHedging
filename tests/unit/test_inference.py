@@ -48,9 +48,9 @@ def test_paired_bootstrap_detects_a_dominant_strategy() -> None:
 
 def test_inference_rejects_invalid_inputs() -> None:
     pnl = _sample(n=100)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"confidence must be in \(0, 1\)"):
         bootstrap_metric(pnl, lambda sample: sample.mean(), confidence=1.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="pnl must be 1-dimensional"):
         bootstrap_metric(pnl.reshape(10, 10), lambda sample: sample.mean())
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="paired samples must match in shape"):
         paired_bootstrap(pnl, pnl[:50], lambda sample: sample.mean())

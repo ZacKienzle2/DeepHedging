@@ -48,16 +48,22 @@ class TiltedGBMSimulator:
     device: str = "cpu"
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.s0 <= 0.0:
-            raise ValueError(f"s0 must be positive, got {self.s0}")
+            msg = f"s0 must be positive, got {self.s0}"
+            raise ValueError(msg)
         if self.sigma < 0.0:
-            raise ValueError(f"sigma must be non-negative, got {self.sigma}")
+            msg = f"sigma must be non-negative, got {self.sigma}"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)
         if abs(self.tilt) > 1.0:
-            raise ValueError(f"tilt beyond one standard deviation per step, got {self.tilt}")
+            msg = f"tilt beyond one standard deviation per step, got {self.tilt}"
+            raise ValueError(msg)
 
     def simulate(self, n_paths: int, noise: NoiseSpec | None = None) -> MarketState:
         """Simulates tilted GBM paths with their likelihood ratios.

@@ -78,7 +78,7 @@ def hedge_pnl(
         with torch.autocast(device_type=device_type, dtype=torch.bfloat16, enabled=amp):
             if use_checkpoint:
                 output = checkpoint(policy, features, hidden, use_reentrant=False)
-                new_position, hidden = cast(tuple[torch.Tensor, torch.Tensor | None], output)
+                new_position, hidden = cast("tuple[torch.Tensor, torch.Tensor | None]", output)
             else:
                 new_position, hidden = policy(features, hidden)
         new_position = new_position.to(paths.dtype)

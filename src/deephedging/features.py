@@ -153,10 +153,11 @@ class MultiAssetFeatures:
         """
         log_moneyness = state.log_relative(t)
         if position.dim() != 2 or position.shape[-1] != self.n_assets:
-            raise ValueError(
+            msg = (
                 f"position must have shape (n_paths, {self.n_assets}); the policy "
                 f"output width must match n_assets, got {tuple(position.shape)}"
             )
+            raise ValueError(msg)
         n_paths = log_moneyness.shape[0]
         return torch.cat((log_moneyness, tau.expand(n_paths, 1), position), dim=-1)
 
@@ -190,9 +191,6 @@ class VarianceFeatures:
 
         Returns:
             Features of shape ``(n_paths, 4)``.
-
-        Raises:
-            KeyError: If the state carries no ``variance`` channel.
         """
         log_moneyness = state.log_relative(t)
         n_paths = log_moneyness.shape[0]

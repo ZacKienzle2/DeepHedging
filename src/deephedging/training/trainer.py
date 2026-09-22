@@ -123,22 +123,31 @@ class TrainConfig:
     lr_schedule: str | None = None
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.compile_policy and self.checkpoint_steps:
-            raise ValueError("compile_policy and checkpoint_steps are mutually exclusive")
+            msg = "compile_policy and checkpoint_steps are mutually exclusive"
+            raise ValueError(msg)
         if self.graph_episode and (self.compile_policy or self.amp):
-            raise ValueError("graph_episode excludes compilation and autocast")
+            msg = "graph_episode excludes compilation and autocast"
+            raise ValueError(msg)
         if self.regenerate_paths and self.graph_episode:
-            raise ValueError("regenerate_paths and graph_episode are mutually exclusive")
+            msg = "regenerate_paths and graph_episode are mutually exclusive"
+            raise ValueError(msg)
         if self.regenerate_paths and self.seed is None:
-            raise ValueError("regenerate_paths requires a seed for deterministic replay")
+            msg = "regenerate_paths requires a seed for deterministic replay"
+            raise ValueError(msg)
         if self.graph_generate and not self.graph_episode:
-            raise ValueError("graph_generate requires graph_episode")
+            msg = "graph_generate requires graph_episode"
+            raise ValueError(msg)
         if self.graph_generate and self.seed is None:
-            raise ValueError("graph_generate requires a seed to address the streams")
+            msg = "graph_generate requires a seed to address the streams"
+            raise ValueError(msg)
         if self.grad_clip_norm is not None and self.grad_clip_norm <= 0.0:
-            raise ValueError(f"grad_clip_norm must be positive, got {self.grad_clip_norm}")
+            msg = f"grad_clip_norm must be positive, got {self.grad_clip_norm}"
+            raise ValueError(msg)
         if self.lr_schedule is not None and self.lr_schedule not in ("cosine", "linear"):
-            raise ValueError(f"lr_schedule must be 'cosine' or 'linear', got {self.lr_schedule!r}")
+            msg = f"lr_schedule must be 'cosine' or 'linear', got {self.lr_schedule!r}"
+            raise ValueError(msg)
 
 
 class _OffsetSimulator(Protocol):
@@ -194,7 +203,7 @@ class _EpisodeLoss(torch.nn.Module):
 
         Args:
             spot: Price grid of shape ``(n_steps + 1, n_paths)``.
-            aux: Auxiliary channels in ``aux_keys`` order.
+            *aux: Auxiliary channels in ``aux_keys`` order.
 
         Returns:
             Scalar risk objective.
@@ -303,7 +312,8 @@ def train(
     """
     device = next(policy.parameters()).device
     if config.graph_episode and device.type != "cuda":
-        raise ValueError("graph_episode requires the policy on a CUDA device")
+        msg = "graph_episode requires the policy on a CUDA device"
+        raise ValueError(msg)
     risk_measure.to(device)
     base_noise = NoiseSpec(seed=config.seed) if config.seed is not None else None
     stepper: HedgePolicy = policy
@@ -361,13 +371,12 @@ def train(
         )
         if config.graph_generate:
             if not hasattr(simulator, "simulate_with_offset"):
-                raise ValueError(
-                    "graph_generate requires a simulator exposing simulate_with_offset"
-                )
+                msg = "graph_generate requires a simulator exposing simulate_with_offset"
+                raise ValueError(msg)
             assert config.seed is not None
             offset_input = torch.zeros((1,), dtype=torch.int64, device=device)
             generated = _GeneratedEpisodeLoss(
-                cast(_OffsetSimulator, simulator),
+                cast("_OffsetSimulator", simulator),
                 episode,
                 config.batch_paths,
                 config.seed,
@@ -410,7 +419,7 @@ def train(
             return episode_loss(batch_state(index))
 
         return cast(
-            torch.Tensor,
+            "torch.Tensor",
             checkpoint(from_noise, *policy.parameters(), *risk_params, use_reentrant=False),
         )
 
@@ -420,12 +429,12 @@ def train(
             assert base_noise is not None
             spec = base_noise.child(iteration + 1)
             offset_input.fill_(spec.stream << 32)
-            loss = cast(torch.Tensor, graphed_loss(offset_input))
+            loss = cast("torch.Tensor", graphed_loss(offset_input))
             optimizer.zero_grad(set_to_none=False)
         elif graphed_loss is not None:
             state = batch_state(iteration + 1)
             channels = (state.spot, *(state.aux[key] for key in aux_keys))
-            loss = cast(torch.Tensor, graphed_loss(*channels))
+            loss = cast("torch.Tensor", graphed_loss(*channels))
             optimizer.zero_grad(set_to_none=False)
         elif config.regenerate_paths:
             loss = regenerated_loss(iteration + 1)

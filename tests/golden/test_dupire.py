@@ -50,13 +50,13 @@ def test_simulator_shape_replay_and_validation() -> None:
     assert torch.all(state.spot[0] == _S0)
     replay = sim.simulate(256, noise=NoiseSpec(seed=181))
     assert torch.equal(state.spot, replay.spot)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="s0 must be positive"):
         LocalVolSimulator(s0=-1.0, surface=surface, maturity=0.5, n_steps=20)
 
 
 def test_surface_grid_validation() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="need at least three maturities"):
         dupire_surface(_PARAMS, _S0, _GRID_STRIKES, _GRID_TAUS[:2])
     uneven = torch.tensor([80.0, 90.0, 95.0, 100.0, 120.0], dtype=torch.float64)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="strikes must be uniformly spaced"):
         dupire_surface(_PARAMS, _S0, uneven, _GRID_TAUS)

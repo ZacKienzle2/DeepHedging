@@ -45,7 +45,8 @@ def implied_vol(
         ValueError: If ``tau`` is not positive.
     """
     if tau <= 0.0:
-        raise ValueError(f"tau must be positive, got {tau}")
+        msg = f"tau must be positive, got {tau}"
+        raise ValueError(msg)
     intrinsic = torch.clamp(spot - strikes, min=0.0)
     valid = (prices > intrinsic) & (prices < spot)
     sqrt_tau = math.sqrt(tau)

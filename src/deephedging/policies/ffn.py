@@ -1,5 +1,7 @@
 """Feedforward hedging policy."""
 
+from typing import override
+
 import torch
 from torch import nn
 
@@ -38,6 +40,7 @@ class FeedForwardPolicy(HedgePolicy):
         layers.append(nn.Linear(width, n_outputs))
         self.net = nn.Sequential(*layers)
 
+    @override
     def forward(
         self, features: torch.Tensor, state: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:

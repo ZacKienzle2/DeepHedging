@@ -27,8 +27,10 @@ class SingleAssetPayoff:
     asset: int = 0
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.asset < 0:
-            raise ValueError(f"asset must be non-negative, got {self.asset}")
+            msg = f"asset must be non-negative, got {self.asset}"
+            raise ValueError(msg)
 
     def __call__(self, paths: torch.Tensor) -> torch.Tensor:
         """Computes the inner payoff on the selected asset column.
@@ -38,8 +40,5 @@ class SingleAssetPayoff:
 
         Returns:
             Payoff per path of shape ``(n_paths,)``.
-
-        Raises:
-            IndexError: If the grid has fewer assets than the index.
         """
         return self.inner(paths[..., self.asset])

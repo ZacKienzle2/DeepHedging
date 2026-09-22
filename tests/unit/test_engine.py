@@ -1,6 +1,7 @@
 """Tests for the hedging episode engine."""
 
 import math
+from typing import override
 
 import torch
 
@@ -8,6 +9,7 @@ from deephedging.evaluation import bs_call_price, delta_hedge_positions
 from deephedging.frictions import NoCost, ProportionalCost
 from deephedging.instruments import EuropeanCall
 from deephedging.market import GBMSimulator, MarketState, NoiseSpec
+from deephedging.policies import FeedForwardPolicy, RecurrentPolicy
 from deephedging.policies.base import HedgePolicy
 from deephedging.training import hedge_pnl, pnl_from_positions
 
@@ -16,12 +18,27 @@ class ConstantPolicy(HedgePolicy):
     """Holds a fixed position at every rebalancing date."""
 
     def __init__(self, value: float) -> None:
+        """Stores the position to hold.
+
+        Args:
+            value: Position held at every date.
+        """
         super().__init__()
         self.value = value
 
+    @override
     def forward(
         self, features: torch.Tensor, state: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        """Returns the constant position for every path.
+
+        Args:
+            features: Per-path features; only the batch size is read.
+            state: Ignored.
+
+        Returns:
+            The constant position per path and no hidden state.
+        """
         return features.new_full((features.shape[0],), self.value), None
 
 
@@ -29,6 +46,7 @@ class ZeroPolicy(ConstantPolicy):
     """Never hedges."""
 
     def __init__(self) -> None:
+        """Holds a flat book."""
         super().__init__(0.0)
 
 
@@ -92,7 +110,6 @@ def test_discrete_delta_hedge_shrinks_pnl_dispersion() -> None:
 
 
 def test_recurrent_policy_threads_state_and_matches_checkpointed_gradients() -> None:
-    from deephedging.policies import RecurrentPolicy
 
     torch.manual_seed(17)
     policy = RecurrentPolicy(hidden_size=8)
@@ -117,21 +134,20 @@ def test_recurrent_policy_threads_state_and_matches_checkpointed_gradients() -> 
 
 
 def test_amp_episode_keeps_fp32_state_and_stays_close() -> None:
-    from deephedging.policies import FeedForwardPolicy
 
     torch.manual_seed(19)
     policy = FeedForwardPolicy(hidden_sizes=(16,))
     state = _state(n_paths=256, n_steps=10)
     payoff = EuropeanCall(strike=100.0)
-    plain = hedge_pnl(state, policy, payoff, NoCost(), premium=4.0)
-    mixed = hedge_pnl(state, policy, payoff, NoCost(), premium=4.0, amp=True)
+    with torch.no_grad():
+        plain = hedge_pnl(state, policy, payoff, NoCost(), premium=4.0)
+        mixed = hedge_pnl(state, policy, payoff, NoCost(), premium=4.0, amp=True)
     assert mixed.dtype == state.spot.dtype
     assert torch.all(torch.isfinite(mixed))
     assert float((mixed - plain).abs().mean()) < 0.05 * float(plain.abs().mean() + 1.0)
 
 
 def test_checkpointed_episode_matches_plain_gradients() -> None:
-    from deephedging.policies import FeedForwardPolicy
 
     torch.manual_seed(13)
     policy = FeedForwardPolicy(hidden_sizes=(8,))

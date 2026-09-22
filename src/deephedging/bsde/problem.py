@@ -10,7 +10,7 @@ BSDE machinery and are deliberately out of scope.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Protocol, override, runtime_checkable
 
 import torch
 
@@ -37,9 +37,10 @@ class Generator(Protocol):
 
 
 @dataclass(frozen=True)
-class ZeroGenerator:
+class ZeroGenerator(Generator):
     """Trivial generator ``f = 0``: ``Y_0`` is the plain expectation of ``g``."""
 
+    @override
     def __call__(
         self, t: torch.Tensor, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor
     ) -> torch.Tensor:
@@ -58,7 +59,7 @@ class ZeroGenerator:
 
 
 @dataclass(frozen=True)
-class DiscountGenerator:
+class DiscountGenerator(Generator):
     """Linear discounting generator ``f = -r y``.
 
     With the forward drift set to the same rate (risk-neutral dynamics),
@@ -71,6 +72,7 @@ class DiscountGenerator:
 
     rate: float
 
+    @override
     def __call__(
         self, t: torch.Tensor, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor
     ) -> torch.Tensor:
@@ -120,13 +122,19 @@ class BSDEProblem:
     mu: float = 0.0
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.dim < 1:
-            raise ValueError(f"dim must be at least 1, got {self.dim}")
+            msg = f"dim must be at least 1, got {self.dim}"
+            raise ValueError(msg)
         if self.x0 <= 0.0:
-            raise ValueError(f"x0 must be positive, got {self.x0}")
+            msg = f"x0 must be positive, got {self.x0}"
+            raise ValueError(msg)
         if self.sigma < 0.0:
-            raise ValueError(f"sigma must be non-negative, got {self.sigma}")
+            msg = f"sigma must be non-negative, got {self.sigma}"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)

@@ -11,6 +11,7 @@ shrink to zero.
 """
 
 import math
+from typing import override
 
 import torch
 from torch import nn
@@ -63,11 +64,14 @@ class NoTransactionBandPolicy(HedgePolicy):
         """
         super().__init__()
         if sigma <= 0.0:
-            raise ValueError(f"sigma must be positive, got {sigma}")
+            msg = f"sigma must be positive, got {sigma}"
+            raise ValueError(msg)
         if maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {maturity}")
+            msg = f"maturity must be positive, got {maturity}"
+            raise ValueError(msg)
         if strike_ratio <= 0.0:
-            raise ValueError(f"strike_ratio must be positive, got {strike_ratio}")
+            msg = f"strike_ratio must be positive, got {strike_ratio}"
+            raise ValueError(msg)
         self.sigma = sigma
         self.maturity = maturity
         self.strike_ratio = strike_ratio
@@ -81,6 +85,7 @@ class NoTransactionBandPolicy(HedgePolicy):
         layers.append(nn.Linear(width, 2))
         self.net = nn.Sequential(*layers)
 
+    @override
     def forward(
         self, features: torch.Tensor, state: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:

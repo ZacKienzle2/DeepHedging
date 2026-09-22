@@ -1,5 +1,7 @@
 """Permutation-equivariant deep-set hedging policy."""
 
+from typing import override
+
 import torch
 from torch import nn
 
@@ -50,7 +52,8 @@ class DeepSetPolicy(HedgePolicy):
         """
         super().__init__()
         if n_assets < 1:
-            raise ValueError(f"n_assets must be at least 1, got {n_assets}")
+            msg = f"n_assets must be at least 1, got {n_assets}"
+            raise ValueError(msg)
         self.n_assets = n_assets
         encoder_layers: list[nn.Module] = []
         width = _TOKEN_FEATURES
@@ -66,6 +69,7 @@ class DeepSetPolicy(HedgePolicy):
             nn.Linear(latent_size, 1),
         )
 
+    @override
     def forward(
         self, features: torch.Tensor, state: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
@@ -86,10 +90,11 @@ class DeepSetPolicy(HedgePolicy):
         """
         expected = 2 * self.n_assets + 1
         if features.shape[-1] != expected:
-            raise ValueError(
+            msg = (
                 f"features must have width {expected} for {self.n_assets} assets, "
                 f"got {features.shape[-1]}"
             )
+            raise ValueError(msg)
         log_moneyness = features[:, : self.n_assets]
         tau = features[:, self.n_assets : self.n_assets + 1]
         position = features[:, self.n_assets + 1 :]

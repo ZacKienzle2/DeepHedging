@@ -1,0 +1,67 @@
+# Derived from the workflow GitHub publishes at
+# actions/starter-workflows/code-scanning/scorecard.yml, with two deliberate
+# departures from it. Every action is pinned to a digest rather than a tag,
+# which is what Scorecard's own Pinned-Dependencies check asks for and what
+# Dependabot then moves. And the weekly cron is gone: a scan on every push to
+# the default branch and on every pull request already covers what changes,
+# and a schedule spends minutes on a tree nobody touched.
+#
+# `gh api repos/actions/starter-workflows/contents/code-scanning/scorecard.yml`
+# prints the current upstream to compare against.
+name: OpenSSF Scorecard
+
+on:
+  branch_protection_rule: {}
+  schedule:
+    - cron: "17 4 * * 1"
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions: read-all
+
+concurrency:
+  group: scorecard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.repository.private == false
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code-scanning
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          sarif_file: results.sarif

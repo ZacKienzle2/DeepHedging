@@ -71,7 +71,8 @@ def make_arm(name: str, device: str) -> HedgePolicy:
         return NoTransactionBandPolicy(sigma=SIGMA, maturity=MATURITY, hidden_sizes=(64, 64)).to(
             device
         )
-    raise ValueError(f"unknown arm {name}")
+    msg = f"unknown arm {name}"
+    raise ValueError(msg)
 
 
 def cost_model(rate: float) -> CostModel:

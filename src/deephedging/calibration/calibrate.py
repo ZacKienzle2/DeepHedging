@@ -155,18 +155,19 @@ def calibrate_heston(
             invertible quote at all.
     """
     if market_prices.shape[0] != len(taus):
-        raise ValueError(
-            f"market_prices has {market_prices.shape[0]} rows for {len(taus)} maturities"
-        )
+        msg = f"market_prices has {market_prices.shape[0]} rows for {len(taus)} maturities"
+        raise ValueError(msg)
     if not taus or any(tau <= 0.0 for tau in taus):
-        raise ValueError(f"taus must be non-empty and positive, got {taus}")
+        msg = f"taus must be non-empty and positive, got {taus}"
+        raise ValueError(msg)
     settings = config if config is not None else CalibrationConfig()
     weights = []
     for row, tau in zip(market_prices, taus, strict=True):
         market_vols = implied_vol(row, s0, strikes, tau)
         usable = torch.isfinite(market_vols)
         if not bool(usable.any()):
-            raise ValueError(f"no quote at maturity {tau} inverts to a finite volatility")
+            msg = f"no quote at maturity {tau} inverts to a finite volatility"
+            raise ValueError(msg)
         safe_vols = torch.where(usable, market_vols, torch.ones_like(market_vols))
         sqrt_tau = math.sqrt(tau)
         d1 = (torch.log(s0 / strikes) + 0.5 * safe_vols**2 * tau) / (safe_vols * sqrt_tau)
@@ -225,16 +226,17 @@ class HestonAnalyticPricer:
                 the risk-neutral closed form cannot represent.
         """
         if not isinstance(simulator, HestonSimulator):
-            raise TypeError(
-                f"analytic pricer requires HestonSimulator, got {type(simulator).__name__}"
-            )
+            msg = f"analytic pricer requires HestonSimulator, got {type(simulator).__name__}"
+            raise TypeError(msg)
         if not isinstance(payoff, EuropeanCall):
-            raise TypeError(f"no closed form for {type(payoff).__name__}")
+            msg = f"no closed form for {type(payoff).__name__}"
+            raise TypeError(msg)
         if simulator.mu != 0.0:
-            raise ValueError(
+            msg = (
                 "analytic pricer assumes risk-neutral zero-drift dynamics; "
                 f"simulator carries mu={simulator.mu}"
             )
+            raise ValueError(msg)
         params = HestonParams(
             v0=simulator.v0,
             kappa=simulator.kappa,

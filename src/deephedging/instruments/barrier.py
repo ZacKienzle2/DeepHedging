@@ -26,10 +26,10 @@ class UpAndOutCall:
     barrier: float
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.barrier <= self.strike:
-            raise ValueError(
-                f"barrier must exceed strike, got barrier={self.barrier} strike={self.strike}"
-            )
+            msg = f"barrier must exceed strike, got barrier={self.barrier} strike={self.strike}"
+            raise ValueError(msg)
 
     def __call__(self, paths: torch.Tensor) -> torch.Tensor:
         """Computes the knocked payoff from the full path.

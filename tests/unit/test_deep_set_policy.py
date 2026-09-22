@@ -3,7 +3,14 @@
 import pytest
 import torch
 
+from deephedging import CVaR, MultiAssetFeatures, TrainConfig, train
+from deephedging.evaluation import expected_shortfall
+from deephedging.frictions import NoCost
+from deephedging.instruments import GeometricBasketCall
+from deephedging.market import CorrelatedGBMSimulator, NoiseSpec
 from deephedging.policies import DeepSetPolicy
+from deephedging.pricing import MonteCarloPricer
+from deephedging.training import hedge_pnl
 
 
 def _features(n_paths: int, n_assets: int, seed: int = 5) -> torch.Tensor:
@@ -44,22 +51,15 @@ def test_parameter_count_is_independent_of_asset_count() -> None:
 
 
 def test_rejects_bad_asset_count_and_feature_width() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="n_assets must be at least 1"):
         DeepSetPolicy(n_assets=0)
     policy = DeepSetPolicy(n_assets=3)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="features must have width 7 for 3 assets"):
         policy(torch.zeros(8, 6))
 
 
 @pytest.mark.slow
 def test_deep_set_policy_trains_a_multi_asset_hedge() -> None:
-    from deephedging import CVaR, MultiAssetFeatures, TrainConfig, train
-    from deephedging.evaluation import expected_shortfall
-    from deephedging.frictions import NoCost
-    from deephedging.instruments import GeometricBasketCall
-    from deephedging.market import CorrelatedGBMSimulator, NoiseSpec
-    from deephedging.pricing import MonteCarloPricer
-    from deephedging.training import hedge_pnl
 
     torch.manual_seed(67)
     sim = CorrelatedGBMSimulator(

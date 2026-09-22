@@ -82,11 +82,11 @@ class BlackScholesPricer:
                 rate, which would price under the wrong measure.
         """
         if not isinstance(simulator, GBMSimulator):
-            raise TypeError(f"closed form requires GBMSimulator, got {type(simulator).__name__}")
+            msg = f"closed form requires GBMSimulator, got {type(simulator).__name__}"
+            raise TypeError(msg)
         if simulator.mu != self.rate:
-            raise ValueError(
-                f"risk-neutral pricing needs simulator drift {self.rate}, got {simulator.mu}"
-            )
+            msg = f"risk-neutral pricing needs simulator drift {self.rate}, got {simulator.mu}"
+            raise ValueError(msg)
         if isinstance(payoff, EuropeanCall):
             value = bs_call_price(
                 simulator.s0, payoff.strike, simulator.sigma, simulator.maturity, self.rate
@@ -96,7 +96,8 @@ class BlackScholesPricer:
                 simulator.s0, payoff.strike, simulator.sigma, simulator.maturity, self.rate
             )
         else:
-            raise TypeError(f"no closed form for {type(payoff).__name__}")
+            msg = f"no closed form for {type(payoff).__name__}"
+            raise TypeError(msg)
         return PriceEstimate(value=float(value), standard_error=0.0, provenance="black-scholes")
 
 

@@ -1,38 +1,63 @@
 name: Nightly GPU
 
+# The fused kernels, graph capture and the device benchmarks need CUDA, which
+# no hosted runner has. pytest-benchmark keeps each night's result in a storage
+# directory outside the checkout and compares the next run against it, so the
+# regression gate is the plugin's own rather than a committed baseline measured
+# on a different device.
 on:
   schedule:
     - cron: "0 14 * * *"
-  workflow_dispatch:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-gpu-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  gpu-tests:
+  gpu:
+    name: GPU tests and benchmarks
     runs-on: [self-hosted, gpu]
+    timeout-minutes: 60
+    env:
+      UV_NO_SYNC: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
-          cache-dependency-glob: uv.lock
-      - name: Install dependencies
-        run: uv sync --extra dev
-      - name: Install CUDA torch on Linux runners
+          cache-dependency-glob: "uv.lock"
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      # The lock resolves the CPU wheel on Linux, so a Linux GPU runner swaps in
+      # the CUDA build of the same version. UV_NO_SYNC keeps uv run from
+      # reinstalling the locked wheel over it.
+      - name: Install the CUDA build of torch on Linux
         if: runner.os == 'Linux'
-        run: uv pip install --reinstall torch --index-url https://download.pytorch.org/whl/cu126
+        run: >-
+          uv pip install --reinstall "torch==$(uv run python -c 'import torch; print(torch.__version__.split("+")[0])')"
+          --index-url https://download.pytorch.org/whl/cu130
+
       - name: Require a CUDA device
+        run:
+          uv run python -c "import torch; assert torch.cuda.is_available(), 'the GPU lane must fail rather than skip'"
+
+      - name: GPU tests
+        run: uv run pytest -m gpu --benchmark-skip
+
+      - name: Benchmarks against the previous night on this runner
         shell: bash
-        run: uv run python -c "import torch; assert torch.cuda.is_available(), 'CUDA unavailable; the GPU lane must fail rather than skip'"
-      - name: GPU test suite
-        shell: bash
-        run: uv run pytest -q -m gpu
-      - name: Benchmark
-        shell: bash
-        run: uv run python benchmarks/bench_paths.py --device cuda --json current.json
-      - name: Regression gate
-        shell: bash
-        run: |
-          if [ -f benchmarks/baseline_cuda.json ]; then
-            uv run python benchmarks/compare_baseline.py benchmarks/baseline_cuda.json current.json
-          else
-            echo "no committed baseline yet; record one from a clean device"
-          fi
+        run: >-
+          uv run pytest -m gpu --benchmark-only --benchmark-autosave
+          --benchmark-storage="file://$HOME/.cache/deephedging/benchmarks" --benchmark-compare
+          --benchmark-compare-fail=median:15% -W ignore::pytest_benchmark.logger.PytestBenchmarkWarning

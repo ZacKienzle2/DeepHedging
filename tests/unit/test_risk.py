@@ -52,9 +52,9 @@ def test_cvar_matches_empirical_expected_shortfall_at_optimum() -> None:
 
 
 def test_cvar_rejects_invalid_alpha() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"alpha must be in \(0, 1\)"):
         CVaR(alpha=0.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"alpha must be in \(0, 1\)"):
         CVaR(alpha=1.0)
 
 
@@ -74,7 +74,7 @@ def test_entropic_increases_with_risk_aversion() -> None:
 
 
 def test_entropic_rejects_invalid_risk_aversion() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="risk_aversion must be positive"):
         Entropic(risk_aversion=0.0)
 
 
@@ -129,9 +129,9 @@ def test_spectral_risk_is_positively_homogeneous_and_translation_invariant() -> 
 
 
 def test_spectral_rejects_invalid_parameters() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="risk_aversion must be positive"):
         SpectralRisk.exponential(risk_aversion=0.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"alpha must be in \(0, 1\)"):
         SpectralRisk.conditional_value_at_risk(alpha=1.0)
 
 
@@ -174,5 +174,5 @@ def test_mean_variance_weighted_matches_unweighted_under_uniform_weights() -> No
 
 
 def test_mean_variance_rejects_negative_aversion() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="risk_aversion must be non-negative"):
         MeanVariance(risk_aversion=-1.0)

@@ -49,11 +49,13 @@ class HestonVarianceSwapSimulator:
     vs_maturity: float
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.vs_maturity <= self.heston.maturity:
-            raise ValueError(
+            msg = (
                 f"vs_maturity must exceed the hedging horizon, got "
                 f"vs_maturity={self.vs_maturity} maturity={self.heston.maturity}"
             )
+            raise ValueError(msg)
 
     @property
     def n_steps(self) -> int:
@@ -105,11 +107,12 @@ class HestonVarianceSwapSimulator:
             with the clamped ``variance`` channel attached.
 
         Raises:
-            AttributeError: If the wrapped sampler offers no offset
-                entry point, which the eager sampler does not.
+            TypeError: If the wrapped sampler offers no offset entry
+                point, which the eager sampler does not.
         """
         if not isinstance(self.heston, CudaHestonSimulator):
-            raise AttributeError("simulate_with_offset requires the fused Heston sampler")
+            msg = "simulate_with_offset requires the fused Heston sampler"
+            raise TypeError(msg)
         return self._extend(self.heston.simulate_with_offset(n_paths, seed, offset))
 
     def _extend(self, state: MarketState) -> MarketState:

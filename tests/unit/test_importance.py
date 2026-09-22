@@ -98,5 +98,5 @@ def test_tilt_reduces_tail_estimator_variance() -> None:
 
 
 def test_invalid_tilt_rejected() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="tilt beyond one standard deviation per step"):
         _tilted(1.5)

@@ -12,7 +12,7 @@ from deephedging.calibration import (
     price_surface,
 )
 from deephedging.instruments import EuropeanCall, EuropeanPut
-from deephedging.market import HestonSimulator
+from deephedging.market import GBMSimulator, HestonSimulator
 from deephedging.pricing import MonteCarloPricer
 
 _TRUE = HestonParams(v0=0.045, kappa=2.0, theta=0.05, xi=0.4, rho=-0.6)
@@ -54,7 +54,6 @@ def test_analytic_pricer_agrees_with_monte_carlo() -> None:
 
 
 def test_analytic_pricer_rejects_out_of_scope() -> None:
-    from deephedging.market import GBMSimulator
 
     heston = HestonSimulator(
         s0=_S0, v0=0.045, kappa=2.0, theta=0.05, xi=0.4, rho=-0.6, maturity=_TAU, n_steps=10

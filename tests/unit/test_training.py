@@ -76,17 +76,19 @@ def test_compiled_policy_trains() -> None:
 
 
 def test_compile_and_checkpoint_mutually_exclusive() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match="compile_policy and checkpoint_steps are mutually exclusive"
+    ):
         TrainConfig(n_iterations=1, batch_paths=8, compile_policy=True, checkpoint_steps=True)
 
 
 def test_grad_clip_norm_rejects_nonpositive() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="grad_clip_norm must be positive"):
         TrainConfig(n_iterations=1, batch_paths=8, grad_clip_norm=0.0)
 
 
 def test_lr_schedule_rejects_unknown_name() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="lr_schedule must be 'cosine' or 'linear'"):
         TrainConfig(n_iterations=1, batch_paths=8, lr_schedule="exponential")
 
 

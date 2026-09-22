@@ -53,22 +53,28 @@ class MertonSimulator:
     device: str = "cpu"
 
     def __post_init__(self) -> None:
+        """Rejects field values outside the documented domain."""
         if self.s0 <= 0.0:
-            raise ValueError(f"s0 must be positive, got {self.s0}")
+            msg = f"s0 must be positive, got {self.s0}"
+            raise ValueError(msg)
         if self.sigma < 0.0:
-            raise ValueError(f"sigma must be non-negative, got {self.sigma}")
+            msg = f"sigma must be non-negative, got {self.sigma}"
+            raise ValueError(msg)
         if self.jump_intensity < 0.0:
-            raise ValueError(f"jump_intensity must be non-negative, got {self.jump_intensity}")
+            msg = f"jump_intensity must be non-negative, got {self.jump_intensity}"
+            raise ValueError(msg)
         if self.jump_vol < 0.0:
-            raise ValueError(f"jump_vol must be non-negative, got {self.jump_vol}")
+            msg = f"jump_vol must be non-negative, got {self.jump_vol}"
+            raise ValueError(msg)
         if self.maturity <= 0.0:
-            raise ValueError(f"maturity must be positive, got {self.maturity}")
+            msg = f"maturity must be positive, got {self.maturity}"
+            raise ValueError(msg)
         if self.n_steps < 1:
-            raise ValueError(f"n_steps must be at least 1, got {self.n_steps}")
+            msg = f"n_steps must be at least 1, got {self.n_steps}"
+            raise ValueError(msg)
         if self.jump_intensity * self.maturity / self.n_steps > 2.0:
-            raise ValueError(
-                "jump_intensity per step exceeds the truncated sampler's range; increase n_steps"
-            )
+            msg = "jump_intensity per step exceeds the truncated sampler's range; increase n_steps"
+            raise ValueError(msg)
 
     @property
     def mean_jump_size(self) -> float:

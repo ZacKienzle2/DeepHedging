@@ -92,11 +92,11 @@ def test_no_gradient_when_held_inside_band() -> None:
 
 
 def test_invalid_parameters_raise() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="sigma must be positive"):
         NoTransactionBandPolicy(sigma=0.0, maturity=_MATURITY)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="maturity must be positive"):
         NoTransactionBandPolicy(sigma=_SIGMA, maturity=0.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="strike_ratio must be positive"):
         NoTransactionBandPolicy(sigma=_SIGMA, maturity=_MATURITY, strike_ratio=0.0)
 
 
