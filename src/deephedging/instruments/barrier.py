@@ -40,6 +40,6 @@ class UpAndOutCall:
         Returns:
             Payoff per path of shape ``(n_paths,)``.
         """
-        alive = paths.max(dim=0).values < self.barrier
+        alive = paths.amax(dim=0) < self.barrier
         vanilla = torch.clamp(paths[-1] - self.strike, min=0.0)
         return vanilla * alive
