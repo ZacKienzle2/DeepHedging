@@ -11,17 +11,7 @@ by [git-cliff](https://git-cliff.org).
 
 ### Added
 
-- **bsde:** Add the deep backward scheme of Hure, Pham and Warin ([6885fad](https://github.com/ZacKienzle2/DeepHedging/commit/6885fad12a347f3f74d65ec7a83341fdbcb4fa03))
-
-- **risk:** Train several risk levels with one level-conditioned policy ([7fcbc8c](https://github.com/ZacKienzle2/DeepHedging/commit/7fcbc8c3810732d6bbc587115ff26546598f17d3))
-
-- **market:** Add the rough Bergomi model with exact grid sampling ([d2ab45c](https://github.com/ZacKienzle2/DeepHedging/commit/d2ab45c2f1633dc808f42eb0761ac2078d5e73b7))
-
-- **calibration:** Invert implied volatility by Let's Be Rational ([818cc24](https://github.com/ZacKienzle2/DeepHedging/commit/818cc24f5f8f9ec7b6a65f293329f07b215a3f7e))
-
-- **market:** Add a randomised quasi-Monte Carlo GBM sampler ([8e6256a](https://github.com/ZacKienzle2/DeepHedging/commit/8e6256ac8b7649810e2d2e16f55ba8ac00e0a6c1))
-
-- **policies:** Add a permutation-equivariant deep-set policy (#14) ([5cf0bf3](https://github.com/ZacKienzle2/DeepHedging/commit/5cf0bf3642169d2efc3743a9a38d047f09cb0b02))
+- **deephedging:** Add the paper extensions and profiling fixes (#22) ([61b7715](https://github.com/ZacKienzle2/DeepHedging/commit/61b77157151c7f1cbf4d6c1e54fe8309449d2f70))
 
 - **market:** Add a fused Merton jump-diffusion CUDA kernel (#12) ([5e52142](https://github.com/ZacKienzle2/DeepHedging/commit/5e5214289d38feb7c3c16928431939ad1889d13b))
 
@@ -116,7 +106,7 @@ by [git-cliff](https://git-cliff.org).
 
 ### Build
 
-- **template:** Adopt the shared repository template ([5450d89](https://github.com/ZacKienzle2/DeepHedging/commit/5450d89d669aee9826c892f896b3d71e08f958c0))
+- **template:** Update to the mutants and vale fixes ([557241b](https://github.com/ZacKienzle2/DeepHedging/commit/557241bdc2a966a3f4d386264fb5965ee6906033))
 
 - Add contributor and ci infrastructure (#5) ([43cdde4](https://github.com/ZacKienzle2/DeepHedging/commit/43cdde4078eca58cbd9474f2ca1c0c269a1ae1c6))
 
@@ -124,22 +114,6 @@ by [git-cliff](https://git-cliff.org).
 
 
 ### Changed
-
-- **bsde:** Fill each date's time tensor once ([a0c1a82](https://github.com/ZacKienzle2/DeepHedging/commit/a0c1a82e06f48db76f866bbca3bbc75fdc8f88d9))
-
-- **networks:** Build every MLP through one helper ([7b707f4](https://github.com/ZacKienzle2/DeepHedging/commit/7b707f494c4c9ff897a36aaf30176d6111d1a822))
-
-- **training:** Split optimizer and schedule out of train ([403829c](https://github.com/ZacKienzle2/DeepHedging/commit/403829c993d2db21dddc893a379dd86ae91851ef))
-
-- **pricing:** Read the Monte Carlo mean and spread in one pass ([1a11c18](https://github.com/ZacKienzle2/DeepHedging/commit/1a11c1881385175398a6969507e61eb1e820a5bf))
-
-- **market:** Accrue the variance swap with cumulative_trapezoid ([cb9f68d](https://github.com/ZacKienzle2/DeepHedging/commit/cb9f68dfe4acc26f13cff6a63e19769c9826d9ff))
-
-- **instruments:** Reduce paths with amax and amin ([23c98dd](https://github.com/ZacKienzle2/DeepHedging/commit/23c98dd7f664e774bec5843568dd4475287215fa))
-
-- **market:** Use torch primitives for jumps and interpolation ([ddb3a6c](https://github.com/ZacKienzle2/DeepHedging/commit/ddb3a6c16feb7cfee0e758b7e6066c7164afccb5))
-
-- **experiments:** Run device queues on a thread pool ([bbeecbe](https://github.com/ZacKienzle2/DeepHedging/commit/bbeecbe397f372ddb4318bb3ac639df32a867ef1))
 
 - **experiments:** Share the runner mechanics through one harness ([5d740fc](https://github.com/ZacKienzle2/DeepHedging/commit/5d740fc13518b1075bdb0e45ff10e2b2662cc099))
 
@@ -157,12 +131,6 @@ by [git-cliff](https://git-cliff.org).
 
 
 ### Documentation
-
-- **performance:** Record the profiling-driven performance review ([ebbdc77](https://github.com/ZacKienzle2/DeepHedging/commit/ebbdc7775ed0fe667429cc5dc46458a88cc98ab8))
-
-- **evaluation:** Cite Capriotti for the adjoint Greeks ([efca05c](https://github.com/ZacKienzle2/DeepHedging/commit/efca05c84b4f8861ff83a6e525178867a9182cfc))
-
-- **calibration:** State the Lord and Kahl continuity result ([175826d](https://github.com/ZacKienzle2/DeepHedging/commit/175826dbe0c12b142c64192bcf254abc27123568))
 
 - **style:** Use plain prose in docstrings and documentation (#11) ([e0d24cb](https://github.com/ZacKienzle2/DeepHedging/commit/e0d24cbbd60000d273309ad22b290767d3486ff2))
 
@@ -186,8 +154,6 @@ by [git-cliff](https://git-cliff.org).
 
 
 ### Fixed
-
-- **evaluation:** Price options through the normalised Black function ([aaead3e](https://github.com/ZacKienzle2/DeepHedging/commit/aaead3e8e69b03450a2c0dc3c6301fefbd37d3de))
 
 - **training:** Tighten the capture headroom warning on Windows ([5e1ce64](https://github.com/ZacKienzle2/DeepHedging/commit/5e1ce64052ccdbd5ef713003cd582a70daf70ae9))
 
@@ -235,24 +201,6 @@ by [git-cliff](https://git-cliff.org).
 
 ### Performance
 
-- **market:** Rescale one unit-maturity rough Bergomi factor ([665c6c5](https://github.com/ZacKienzle2/DeepHedging/commit/665c6c569496b1b08e354d64cc97a687dcbc750c))
-
-- **features:** Build the level code column once per shape and device ([55ca942](https://github.com/ZacKienzle2/DeepHedging/commit/55ca94202b7008768693aaca48e93e6427ae1c91))
-
-- **policies:** Evaluate the band network once over all dates ([747deb5](https://github.com/ZacKienzle2/DeepHedging/commit/747deb5d017c0cafdd524faf506ac6d9ea70eac8))
-
-- **evaluation:** Price the Merton series in one broadcast call ([d0ddc3f](https://github.com/ZacKienzle2/DeepHedging/commit/d0ddc3fbdb913d3b8db0427c557ad5817efc1f2a))
-
-- **bsde:** Evaluate the Z network over all dates in one call ([8aabf5d](https://github.com/ZacKienzle2/DeepHedging/commit/8aabf5da148bc5c49e8c50451bf4e494a17008f7))
-
-- **calibration:** Fit Heston quotes with L-BFGS ([2c7df6a](https://github.com/ZacKienzle2/DeepHedging/commit/2c7df6afbc8c732f0c1badeab39b59c5414faf8d))
-
-- **evaluation:** Evaluate bootstrap resamples as one batch ([a352727](https://github.com/ZacKienzle2/DeepHedging/commit/a352727929fe7862f9e71df6655a2040f680b7e1))
-
-- **training:** Capture the whole iteration in one CUDA graph ([b8bbd27](https://github.com/ZacKienzle2/DeepHedging/commit/b8bbd27718c60fa6a57be747d210e016f4cb3394))
-
-- **training:** Settle gains and costs outside the policy recursion ([06b5562](https://github.com/ZacKienzle2/DeepHedging/commit/06b5562f24bc33e07a8e71a2da7b25ba1d589493))
-
 - **frictions:** Cache the per-asset rate tensor by device and dtype ([5bc94a3](https://github.com/ZacKienzle2/DeepHedging/commit/5bc94a3873a6a3105d1234e7d5605bd44dbb020e))
 
 - Hoist per-step scalar work out of the heston loop ([180c53d](https://github.com/ZacKienzle2/DeepHedging/commit/180c53d2fe31bc4c5af747ab958ad6fe908a3692))
@@ -261,10 +209,6 @@ by [git-cliff](https://git-cliff.org).
 
 
 ### Tests
-
-- **baselines:** Ghostwrite equivalence tests for the replaced loops ([b724890](https://github.com/ZacKienzle2/DeepHedging/commit/b724890f0cc826eadea79fc5df9bc1afc4545394))
-
-- **risk:** Read the objective without a live autograd graph ([a8793c5](https://github.com/ZacKienzle2/DeepHedging/commit/a8793c5af626cd9198e811b8164d62ff27cc02ed))
 
 - Pin stressed swap positivity and the eval routing invariant ([57bc07f](https://github.com/ZacKienzle2/DeepHedging/commit/57bc07ff1581bd7dcbfb118b3762fb062f7f6f2c))
 
