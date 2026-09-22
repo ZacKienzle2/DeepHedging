@@ -1,14 +1,25 @@
-"""Black-Scholes closed forms and the delta-hedge baseline."""
+"""Black-Scholes closed forms and the delta-hedge baseline.
+
+Every function broadcasts over tensors in each market argument, so the
+implied-volatility inversion and the calibration weights evaluate a whole
+strike grid and a tensor of volatilities through the same formulas as the
+scalar baselines. A float volatility is validated here; a tensor one is the
+caller's to keep positive, since checking it would read it back to the host.
+"""
 
 import math
 
 import torch
 
+Market = torch.Tensor | float
+
+_SQRT_2PI = math.sqrt(2.0 * math.pi)
+
 
 def _d1(
-    spot: torch.Tensor, strike: float, sigma: float, tau: torch.Tensor, rate: float
+    spot: torch.Tensor, strike: Market, sigma: Market, tau: torch.Tensor, rate: float
 ) -> torch.Tensor:
-    if sigma <= 0.0:
+    if isinstance(sigma, float) and sigma <= 0.0:
         msg = f"sigma must be positive, got {sigma}"
         raise ValueError(msg)
     if bool(torch.any(tau <= 0.0)):
@@ -18,23 +29,23 @@ def _d1(
 
 
 def bs_call_price(
-    spot: torch.Tensor | float,
-    strike: float,
-    sigma: float,
-    tau: torch.Tensor | float,
+    spot: Market,
+    strike: Market,
+    sigma: Market,
+    tau: Market,
     rate: float = 0.0,
 ) -> torch.Tensor:
     """Black-Scholes price of a European call.
 
     Args:
         spot: Spot price; scalar or tensor.
-        strike: Strike price.
-        sigma: Volatility.
+        strike: Strike price; scalar or tensor.
+        sigma: Volatility; scalar or tensor.
         tau: Time to maturity; scalar or tensor broadcastable with ``spot``.
         rate: Continuously compounded interest rate.
 
     Returns:
-        Call price with the broadcast shape of ``spot`` and ``tau``.
+        Call price with the broadcast shape of the inputs.
     """
     spot_t = torch.as_tensor(spot, dtype=torch.float64)
     tau_t = torch.as_tensor(tau, dtype=torch.float64)
@@ -45,10 +56,10 @@ def bs_call_price(
 
 
 def bs_put_price(
-    spot: torch.Tensor | float,
+    spot: Market,
     strike: float,
     sigma: float,
-    tau: torch.Tensor | float,
+    tau: Market,
     rate: float = 0.0,
 ) -> torch.Tensor:
     """Black-Scholes price of a European put via put-call parity.
@@ -70,10 +81,10 @@ def bs_put_price(
 
 
 def bs_call_delta(
-    spot: torch.Tensor | float,
+    spot: Market,
     strike: float,
     sigma: float,
-    tau: torch.Tensor | float,
+    tau: Market,
     rate: float = 0.0,
 ) -> torch.Tensor:
     """Black-Scholes delta of a European call.
@@ -91,6 +102,31 @@ def bs_call_delta(
     spot_t = torch.as_tensor(spot, dtype=torch.float64)
     tau_t = torch.as_tensor(tau, dtype=torch.float64)
     return torch.special.ndtr(_d1(spot_t, strike, sigma, tau_t, rate))
+
+
+def bs_call_vega(
+    spot: Market,
+    strike: Market,
+    sigma: Market,
+    tau: Market,
+    rate: float = 0.0,
+) -> torch.Tensor:
+    """Black-Scholes vega of a European call.
+
+    Args:
+        spot: Spot price; scalar or tensor.
+        strike: Strike price; scalar or tensor.
+        sigma: Volatility; scalar or tensor.
+        tau: Time to maturity; scalar or tensor broadcastable with ``spot``.
+        rate: Continuously compounded interest rate.
+
+    Returns:
+        Vega with the broadcast shape of the inputs.
+    """
+    spot_t = torch.as_tensor(spot, dtype=torch.float64)
+    tau_t = torch.as_tensor(tau, dtype=torch.float64)
+    d1 = _d1(spot_t, strike, sigma, tau_t, rate)
+    return spot_t * torch.exp(-0.5 * d1**2) / _SQRT_2PI * torch.sqrt(tau_t)
 
 
 def delta_hedge_positions(
@@ -124,32 +160,3 @@ def delta_hedge_positions(
     tau = (maturity - times).unsqueeze(1)
     deltas = bs_call_delta(paths[:-1].to(torch.float64), strike, sigma, tau, rate)
     return deltas.to(paths.dtype)
-
-
-_SQRT_2PI = math.sqrt(2.0 * math.pi)
-
-
-def bs_call_vega(
-    spot: torch.Tensor | float,
-    strike: float,
-    sigma: float,
-    tau: torch.Tensor | float,
-    rate: float = 0.0,
-) -> torch.Tensor:
-    """Black-Scholes vega of a European call.
-
-    Args:
-        spot: Spot price; scalar or tensor.
-        strike: Strike price.
-        sigma: Volatility.
-        tau: Time to maturity; scalar or tensor broadcastable with ``spot``.
-        rate: Continuously compounded interest rate.
-
-    Returns:
-        Vega with the broadcast shape of the inputs.
-    """
-    spot_t = torch.as_tensor(spot, dtype=torch.float64)
-    tau_t = torch.as_tensor(tau, dtype=torch.float64)
-    d1 = _d1(spot_t, strike, sigma, tau_t, rate)
-    density = torch.exp(-0.5 * d1**2) / _SQRT_2PI
-    return spot_t * density * torch.sqrt(tau_t)

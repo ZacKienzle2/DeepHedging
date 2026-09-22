@@ -16,7 +16,7 @@ import math
 
 import torch
 
-_SQRT_2PI = math.sqrt(2.0 * math.pi)
+from deephedging.evaluation.black_scholes import bs_call_price, bs_call_vega
 
 
 def implied_vol(
@@ -54,33 +54,21 @@ def implied_vol(
     high = torch.full_like(prices, 5.0)
     for _ in range(25):
         mid = 0.5 * (low + high)
-        above = _bs_price_grid(spot, strikes, mid, tau) > prices
+        above = bs_call_price(spot, strikes, mid, tau) > prices
         high = torch.where(above, mid, high)
         low = torch.where(above, low, mid)
     sigma = 0.5 * (low + high)
     for _ in range(n_iterations):
-        model = _bs_price_grid(spot, strikes, sigma, tau)
+        residual = bs_call_price(spot, strikes, sigma, tau) - prices
+        ratio = residual / torch.clamp(bs_call_vega(spot, strikes, sigma, tau), min=1e-12)
         d1 = (torch.log(spot / strikes) + 0.5 * sigma**2 * tau) / (sigma * sqrt_tau)
-        d2 = d1 - sigma * sqrt_tau
-        density = torch.exp(-0.5 * d1**2) / _SQRT_2PI
-        vega = spot * density * sqrt_tau
-        residual = model - prices
-        ratio = residual / torch.clamp(vega, min=1e-12)
-        denominator = 1.0 - 0.5 * ratio * (d1 * d2 / sigma)
+        vomma_over_vega = d1 * (d1 - sigma * sqrt_tau) / sigma
+        denominator = 1.0 - 0.5 * ratio * vomma_over_vega
         guarded = torch.where(
             denominator.abs() < 1e-8, torch.full_like(denominator, 1.0), denominator
         )
         sigma = torch.clamp(sigma - ratio / guarded, min=1e-4, max=5.0)
-    final_residual = (_bs_price_grid(spot, strikes, sigma, tau) - prices).abs()
+    final_residual = (bs_call_price(spot, strikes, sigma, tau) - prices).abs()
     converged = final_residual < 1e-6 * spot
     keep = valid & converged
     return torch.where(keep, sigma, torch.full_like(sigma, float("nan")))
-
-
-def _bs_price_grid(
-    spot: float, strikes: torch.Tensor, sigma: torch.Tensor, tau: float
-) -> torch.Tensor:
-    sqrt_tau = math.sqrt(tau)
-    d1 = (torch.log(spot / strikes) + 0.5 * sigma**2 * tau) / (sigma * sqrt_tau)
-    d2 = d1 - sigma * sqrt_tau
-    return spot * torch.special.ndtr(d1) - strikes * torch.special.ndtr(d2)

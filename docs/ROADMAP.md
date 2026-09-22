@@ -204,7 +204,7 @@ Turn the pricing and calibration corners into first-class subsystems.
 - `[planned]` SVI and SSVI surface parametrisation with no-butterfly-arbitrage
   constraints, replacing wing clamping with a principled fit.
 - `[planned]` Global optimisers (differential evolution, CMA-ES) for the
-  non-convex calibration surface, with the Adam local polish retained.
+  non-convex calibration surface, with the L-BFGS local polish retained.
 - `[planned]` SABR calibration through the Hagan expansion.
 - `[research]` Joint and path-dependent calibration to American, barrier, and
   variance-swap quotes.

@@ -25,9 +25,7 @@ def test_synthetic_parameter_recovery() -> None:
     taus = (0.25, 1.0, 3.0)
     market = torch.stack([price_surface(_TRUE.as_tensors(), _S0, _STRIKES, tau) for tau in taus])
     initial = HestonParams(v0=0.09, kappa=1.0, theta=0.02, xi=0.7, rho=-0.2)
-    result = calibrate_heston(
-        market, _S0, _STRIKES, taus, initial, CalibrationConfig(n_iterations=800, lr=5e-2)
-    )
+    result = calibrate_heston(market, _S0, _STRIKES, taus, initial, CalibrationConfig())
     assert result.final_loss < result.losses[0] * 1e-4
     for tau, row in zip(taus, market, strict=True):
         refit = price_surface(result.params.as_tensors(), _S0, _STRIKES, tau)
