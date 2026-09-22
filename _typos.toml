@@ -17,3 +17,4 @@ check-file = false
 
 [default.extend-words]
 Pn = "Pn"
+Ba = "Ba"

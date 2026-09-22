@@ -60,6 +60,8 @@ capture cuts that iteration by a further third; the noise-regenerative backward
 cuts peak training memory 12.7x at a quarter-million paths and lifts the
 feasible batch from a quarter million to beyond two million paths on a
 sixteen-gigabyte device.
+[docs/performance-review.md](docs/performance-review.md) records the profiles,
+the literature and the before and after measurements behind each optimisation.
 
 ## Layout
 
@@ -89,7 +91,7 @@ csrc/             Fused Philox path kernels (CUDA)
 experiments/      Seven studies with committed result stores
 tests/            Unit suite, golden tests, design invariants, benchmarks,
                   ghostwritten equivalence and fuzz tests
-docs/             Roadmap
+docs/             Roadmap and the profiling-driven performance review
 Main.ipynb        End-to-end walkthrough
 ```
 

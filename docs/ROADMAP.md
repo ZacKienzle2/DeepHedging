@@ -105,9 +105,17 @@ new subsystem.
   risk parameters and addresses per-rank streams, so this adds the integration
   and a two-rank parity test.
 - `[research]` Full-episode `torch.compile`, contingent on the feature-map graph
-  breaks being resolvable.
+  breaks being resolvable and on a Triton build for the target platform. The
+  performance review names fusing the bias-gradient reductions and the
+  activation backward as what it would remove.
 - `[done]` The no-transaction band reads the market state alone, as in Imaki et
   al. (2021), so its network runs once over all dates.
+- `[research]` One weight-gradient GEMM per layer over all dates for the
+  feedforward and recurrent policies, through a custom autograd function over
+  the policy recursion.
+- `[research]` A fully fused kernel for the 64-wide policy networks after Muller
+  et al. (2021), so the SiLU activations and the bias-gradient reductions stay
+  on chip rather than crossing global memory at every layer.
 
 ### Evaluation
 
@@ -149,6 +157,10 @@ face.
 - `[planned]` SABR with an arbitrage-aware sampling scheme.
 - `[done]` Rough Bergomi sampled exactly on the rebalancing grid through the
   Cholesky factor of Bayer, Friz and Gatheral (2016).
+- `[done]` One rough Bergomi factor per Hurst exponent, correlation and grid,
+  rescaled to each maturity through the self-similarity of the covariance.
+- `[planned]` The rough Bergomi covariance function evaluated in double
+  precision rather than through mpmath, for the first build of the factor.
 - `[research]` Rough Heston, and the hybrid scheme for the fractional kernel on
   grids too fine for the Cholesky factor.
 - `[research]` Local-stochastic volatility coupling a calibrated local surface
@@ -165,7 +177,7 @@ face.
 - `[planned]` Fused correlated multi-asset kernel with a register-held Cholesky
   factor.
 - `[done]` Scrambled Sobol points with the Brownian bridge in the eager GBM
-  sampler.
+  sampler, measured against pseudo-random paths in the performance review.
 - `[research]` A fused Sobol path kernel, with the antithetic and
   control-variate invariants re-measured under the new sampler.
 
@@ -202,6 +214,9 @@ Turn the pricing and calibration corners into first-class subsystems.
   extended off the zero-rate assumption.
 - `[done]` The deep backward scheme of Hure, Pham and Warin (2020), with its
   reflected variant for optimal stopping and American pricing.
+- `[planned]` The backward scheme's optimisation step captured as one CUDA
+  graph, as the training loop already is, since at 1024 paths issuing its
+  launches takes the host five times as long as the device takes to run them.
 - `[research]` Fully nonlinear and second-order BSDE for HJB problems, uncertain
   volatility, and gamma constraints, the scope the current semilinear solver
   fences out.
@@ -211,6 +226,10 @@ Turn the pricing and calibration corners into first-class subsystems.
 
 - `[done]` Implied volatility by Jaeckel's Let's Be Rational, and prices through
   his normalised Black function, both to about 3e-15 relative error.
+- `[research]` A predicated normalised Black function for the device, every
+  regime evaluated and selected by `torch.where`, so the inversion needs no host
+  synchronisation and can be captured. The device inversion is three times
+  slower than the processor one today.
 - `[planned]` Non-zero rates and dividend yields across the
   characteristic-function and inversion stack.
 - `[planned]` SVI and SSVI surface parametrisation with no-butterfly-arbitrage
