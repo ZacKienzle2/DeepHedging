@@ -48,7 +48,8 @@ def test_cvar_matches_empirical_expected_shortfall_at_optimum() -> None:
     measure = CVaR(alpha=0.9)
     with torch.no_grad():
         measure.threshold.copy_(torch.quantile(loss, 0.9))
-    assert abs(float(measure(loss)) - empirical) < 1e-6
+        value = float(measure(loss))
+    assert abs(value - empirical) < 1e-6
 
 
 def test_cvar_rejects_invalid_alpha() -> None:
