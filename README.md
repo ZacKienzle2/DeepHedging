@@ -65,7 +65,8 @@ sixteen-gigabyte device.
 
 ```text
 src/deephedging/
-|-- market/       GBM, Heston, Merton jumps, correlated multi-asset,
+|-- market/       GBM (pseudo-random, or scrambled Sobol through a Brownian
+|                 bridge), Heston, Merton jumps, correlated multi-asset,
 |                 local vol, tilted, variance swap; fused CUDA samplers
 |-- instruments/  European, barrier, basket payoffs and adapters
 |-- frictions/    Proportional and per-asset transaction cost models

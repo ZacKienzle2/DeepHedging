@@ -158,9 +158,10 @@ face.
   now that the eager jump sampler is the bottleneck.
 - `[planned]` Fused correlated multi-asset kernel with a register-held Cholesky
   factor.
-- `[research]` Quasi-Monte Carlo path kernels (scrambled Sobol) for the
-  smooth-payoff regime, with the antithetic and control-variate invariants
-  re-measured under the new sampler.
+- `[done]` Scrambled Sobol points with the Brownian bridge in the eager GBM
+  sampler.
+- `[research]` A fused Sobol path kernel, with the antithetic and
+  control-variate invariants re-measured under the new sampler.
 
 ### Instruments
 
