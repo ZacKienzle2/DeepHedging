@@ -38,6 +38,7 @@ from deephedging.evaluation import (
 from deephedging.features import (
     DefaultFeatures,
     FeatureMap,
+    LevelFeatures,
     MultiAssetFeatures,
     RunningMaxFeatures,
     VarianceFeatures,
@@ -89,7 +90,14 @@ from deephedging.pricing import (
     PriceEstimate,
     Pricer,
 )
-from deephedging.risk import CVaR, Entropic, MeanVariance, RiskMeasure, SpectralRisk
+from deephedging.risk import (
+    CVaR,
+    Entropic,
+    MeanVariance,
+    MultiLevelRisk,
+    RiskMeasure,
+    SpectralRisk,
+)
 from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, train
 
 __version__ = "0.1.0"
@@ -123,6 +131,7 @@ __all__ = [
     "HedgePolicy",
     "HestonSimulator",
     "HestonVarianceSwapSimulator",
+    "LevelFeatures",
     "LocalVolSimulator",
     "LookbackCall",
     "LookbackPut",
@@ -131,6 +140,7 @@ __all__ = [
     "MertonSimulator",
     "MonteCarloPricer",
     "MultiAssetFeatures",
+    "MultiLevelRisk",
     "NoCost",
     "NoTransactionBandPolicy",
     "NoiseSpec",

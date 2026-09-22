@@ -203,3 +203,46 @@ class VarianceFeatures:
             ),
             dim=-1,
         )
+
+
+@dataclass(frozen=True)
+class LevelFeatures:
+    """Another feature map's observation plus the path's risk-level code.
+
+    Path ``i`` carries ``codes[i mod K]``, matching the interleaved level
+    assignment of :class:`~deephedging.risk.multi_level.MultiLevelRisk`, so
+    the policy sees which risk level it is hedging for, as in Murray et al.
+    (2022, Section 2.3). A code such as the logarithm of the risk aversion
+    places the levels on the scale the paper samples them on.
+
+    Attributes:
+        base: Feature map whose columns come first.
+        codes: One code per level, in level order.
+    """
+
+    base: FeatureMap
+    codes: tuple[float, ...]
+
+    @property
+    def n_features(self) -> int:
+        """Width of the produced feature vector."""
+        return self.base.n_features + 1
+
+    def __call__(
+        self, state: MarketState, t: int, tau: torch.Tensor, position: torch.Tensor
+    ) -> torch.Tensor:
+        """Computes the base features and appends the level code.
+
+        Args:
+            state: Simulated market state.
+            t: Index of the current rebalancing date.
+            tau: Scalar tensor, normalised time to maturity at ``t``.
+            position: Position held entering ``t``, shape ``(n_paths,)``.
+
+        Returns:
+            Features of shape ``(n_paths, base.n_features + 1)``.
+        """
+        features = self.base(state, t, tau, position)
+        codes = features.new_tensor(self.codes)
+        column = codes.repeat(features.shape[0] // codes.shape[0])
+        return torch.cat((features, column.unsqueeze(-1)), dim=-1)

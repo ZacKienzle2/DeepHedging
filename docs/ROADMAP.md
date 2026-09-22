@@ -83,6 +83,10 @@ new subsystem.
 - `[done]` Mean-variance and mean-semivariance objectives for the classical
   baseline the objective study lacked. They reduce to the sample mean as the
   aversion vanishes, and the downside variant ignores gains.
+- `[done]` Several risk levels in one training run, after Murray et al. (2022):
+  `LevelFeatures` shows each path its level and `MultiLevelRisk` averages the
+  level risks. Five entropic levels trained in a quarter of the time of five
+  separate runs.
 - `[planned]` Robust and worst-case objectives over a parameter ambiguity set
   for model-uncertainty hedging.
 

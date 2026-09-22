@@ -71,9 +71,10 @@ src/deephedging/
 |                 samplers
 |-- instruments/  European, barrier, basket payoffs and adapters
 |-- frictions/    Proportional and per-asset transaction cost models
-|-- risk/         Rockafellar-Uryasev CVaR, entropic risk
+|-- risk/         Rockafellar-Uryasev CVaR, entropic, spectral, mean-variance;
+|                 several risk levels trained by one policy
 |-- policies/     Feedforward, recurrent, no-transaction-band networks
-|-- features.py   Observation construction
+|-- features.py   Observation construction, including a risk-level code
 |-- training/     Episode engine, training loop, graph capture,
 |                 regenerative backward
 |-- calibration/  Heston characteristic function, COS pricing, surface fit,
