@@ -74,8 +74,8 @@ def test_band_anchor_matches_closed_form_delta() -> None:
             with torch.no_grad():
                 upper, _ = policy(high_features)
                 lower, _ = policy(low_features)
-                high_widths = torch.nn.functional.softplus(policy.net(high_features))
-                low_widths = torch.nn.functional.softplus(policy.net(low_features))
+                high_widths = torch.nn.functional.softplus(policy.net(high_features[..., :2]))
+                low_widths = torch.nn.functional.softplus(policy.net(low_features[..., :2]))
             spot = 100.0 * torch.tensor(log_moneyness).exp()
             delta = float(bs_call_delta(spot, 100.0, _SIGMA, tau * _MATURITY))
             assert float(upper) == pytest.approx(delta + float(high_widths[0, 1]), abs=1e-5)

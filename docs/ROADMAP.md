@@ -102,6 +102,8 @@ new subsystem.
   and a two-rank parity test.
 - `[research]` Full-episode `torch.compile`, contingent on the feature-map graph
   breaks being resolvable.
+- `[done]` The no-transaction band reads the market state alone, as in Imaki et
+  al. (2021), so its network runs once over all dates.
 
 ### Evaluation
 

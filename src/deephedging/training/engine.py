@@ -8,6 +8,13 @@ the recursion rather than inside it. This is loop distribution in the sense
 of Allen and Kennedy's vectorisation algorithm: the statements outside the
 dependence cycle leave the loop and run as whole-grid kernels, which cuts
 the per-date launch count the eager engine is bound by.
+
+A no-transaction-band policy has no dependence cycle through its network,
+since its band is a function of the market state alone. Its network runs
+once over every date, so each weight-gradient multiply reduces over all
+dates and paths together, the batching of the non-recurrent work that
+Appleyard, Kocisky and Blunsom recommend for recurrent networks, and only
+the elementwise clamp remains sequential.
 """
 
 from typing import cast
@@ -19,6 +26,7 @@ from deephedging.features import DefaultFeatures, FeatureMap
 from deephedging.frictions.base import CostModel
 from deephedging.instruments.base import Payoff
 from deephedging.market.state import MarketState
+from deephedging.policies.band import NoTransactionBandPolicy
 from deephedging.policies.base import HedgePolicy
 
 
@@ -42,6 +50,17 @@ def _positions(
     use_checkpoint = checkpoint_steps and torch.is_grad_enabled()
     device_type = paths.device.type
     held: list[torch.Tensor] = []
+    if isinstance(policy, NoTransactionBandPolicy) and not use_checkpoint:
+        grid = torch.stack([features_of(state, t, taus[t], position) for t in range(n_steps)])
+        with torch.autocast(
+            device_type=device_type, dtype=torch.bfloat16, enabled=amp, cache_enabled=False
+        ):
+            lower, upper = policy.bands(grid)
+        lower, upper = lower.to(paths.dtype), upper.to(paths.dtype)
+        for t in range(n_steps):
+            position = torch.clamp(position, lower[t], upper[t])
+            held.append(position)
+        return torch.stack(held)
     for t in range(n_steps):
         features = features_of(state, t, taus[t], position)
         with torch.autocast(

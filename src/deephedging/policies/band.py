@@ -8,24 +8,34 @@ and generalises better than a free-form position network whenever the
 band assumption holds. The Black-Scholes delta anchors the band, so
 the policy degenerates gracefully to the model hedge as both widths
 shrink to zero.
+
+The band is a function of the market state alone. Davis, Panas and
+Zariphopoulou (1993) and Whalley and Wilmott (1997, eq. 3.10) find the
+buy and sell boundaries as curves in (S, t), and the network of Imaki
+et al. (2021, eq. 12) accordingly omits the held position from its
+input. The held position enters only the clamp, so the widths of every
+date can be computed in one call before the clamp recursion runs.
 """
 
 import math
-from typing import override
+from typing import cast, override
 
 import torch
 from torch import nn
 
 from deephedging.policies.base import HedgePolicy
 
+_HELD = 2
+
 
 class NoTransactionBandPolicy(HedgePolicy):
     """Network-widened no-transaction band around the model delta.
 
-    The network maps the observation to two widths through a softplus,
-    the band is the model delta minus the lower width to the model
-    delta plus the upper width, and the position is the held inventory
-    clamped to the band. Gradients reach the widths exactly when their
+    The network maps the market columns of the observation, every column
+    but the held position, to two widths through a softplus, the band is
+    the model delta minus the lower width to the model delta plus the
+    upper width, and the position is the held inventory clamped to the
+    band. Gradients reach the widths exactly when their
     edge binds, which is the no-transaction-band training trick of
     Imaki and co-authors. The anchor delta is computed from the
     observation, so the policy needs the market volatility, horizon,
@@ -55,7 +65,7 @@ class NoTransactionBandPolicy(HedgePolicy):
             n_features: Number of input features per path; the first
                 must be log moneyness against the initial spot, the
                 second the normalised time to maturity, and the third
-                the held position.
+                the held position, which the band network does not see.
             hidden_sizes: Hidden layer widths of the band network.
 
         Raises:
@@ -76,14 +86,35 @@ class NoTransactionBandPolicy(HedgePolicy):
         self.maturity = maturity
         self.strike_ratio = strike_ratio
         self.log_strike_ratio = math.log(strike_ratio)
+        market = [column for column in range(n_features) if column != _HELD]
+        self.register_buffer("market_columns", torch.tensor(market), persistent=False)
         layers: list[nn.Module] = []
-        width = n_features
+        width = len(market)
         for size in hidden_sizes:
             layers.append(nn.Linear(width, size))
             layers.append(nn.SiLU())
             width = size
         layers.append(nn.Linear(width, 2))
         self.net = nn.Sequential(*layers)
+
+    def bands(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Computes the band edges from the market columns.
+
+        Args:
+            features: Observations of shape ``(..., n_features)``, laid out
+                as for :meth:`forward`; the held position is ignored, so
+                any leading batch shape, such as every date at once, works.
+
+        Returns:
+            The lower and upper edges, each of the leading shape.
+        """
+        log_moneyness = features[..., 0] - self.log_strike_ratio
+        remaining = torch.clamp(features[..., 1] * self.maturity, min=1e-8)
+        scale = self.sigma * torch.sqrt(remaining)
+        delta = torch.special.ndtr((log_moneyness + 0.5 * self.sigma**2 * remaining) / scale)
+        market = features.index_select(-1, cast("torch.Tensor", self.market_columns))
+        widths = nn.functional.softplus(self.net(market))
+        return delta - widths[..., 0], delta + widths[..., 1]
 
     @override
     def forward(
@@ -101,12 +132,5 @@ class NoTransactionBandPolicy(HedgePolicy):
             Tuple of the position per path, shape ``(n_paths,)``, and
             ``None``.
         """
-        log_moneyness = features[..., 0] - self.log_strike_ratio
-        remaining = torch.clamp(features[..., 1] * self.maturity, min=1e-8)
-        scale = self.sigma * torch.sqrt(remaining)
-        delta = torch.special.ndtr((log_moneyness + 0.5 * self.sigma**2 * remaining) / scale)
-        widths = nn.functional.softplus(self.net(features))
-        lower = delta - widths[..., 0]
-        upper = delta + widths[..., 1]
-        held = features[..., 2]
-        return torch.maximum(torch.minimum(held, upper), lower), None
+        lower, upper = self.bands(features)
+        return torch.clamp(features[..., _HELD], lower, upper), None
