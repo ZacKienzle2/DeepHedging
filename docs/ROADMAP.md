@@ -202,6 +202,8 @@ Turn the pricing and calibration corners into first-class subsystems.
 
 ### Calibration
 
+- `[done]` Implied volatility by Jaeckel's Let's Be Rational, and prices through
+  his normalised Black function, both to about 3e-15 relative error.
 - `[planned]` Non-zero rates and dividend yields across the
   characteristic-function and inversion stack.
 - `[planned]` SVI and SSVI surface parametrisation with no-butterfly-arbitrage

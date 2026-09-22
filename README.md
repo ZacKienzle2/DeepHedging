@@ -75,7 +75,8 @@ src/deephedging/
 |-- features.py   Observation construction
 |-- training/     Episode engine, training loop, graph capture,
 |                 regenerative backward
-|-- calibration/  Heston characteristic function, COS pricing, surface fit
+|-- calibration/  Heston characteristic function, COS pricing, surface fit,
+|                 Let's Be Rational implied volatility
 |-- evaluation/   Closed forms through the normalised Black function,
 |                 American exercise, baselines, metrics
 |-- bsde/         Deep BSDE solver for semilinear pricing PDEs

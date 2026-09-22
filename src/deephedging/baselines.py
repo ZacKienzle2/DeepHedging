@@ -9,6 +9,7 @@ its oracle is the defining formula in 400-digit mpmath arithmetic instead,
 which no cancellation reaches. None of them is exported or used at run time.
 """
 
+import functools
 import math
 from typing import Any, cast
 
@@ -184,3 +185,41 @@ def bs_call_price_by_mpmath(
     """
     value = _call_by_mpmath(spot, strike, sigma, tau, rate, digits=400)
     return torch.tensor(float(value), dtype=torch.float64)
+
+
+def implied_vol_by_mpmath(
+    prices: torch.Tensor, spot: float, strikes: torch.Tensor, tau: float
+) -> torch.Tensor:
+    """Inverts each call price by bisection on the price in 60-digit arithmetic.
+
+    Sixty digits hold every price above ``1e-40`` of spot exactly through the
+    subtraction, and bisection needs no derivative and cannot leave its
+    bracket.
+
+    Args:
+        prices: Call prices of shape ``(n_strikes,)``.
+        spot: Spot price.
+        strikes: Strike grid of shape ``(n_strikes,)``.
+        tau: Time to maturity in years.
+
+    Returns:
+        Implied volatilities of shape ``(n_strikes,)`` in float64.
+    """
+    roots: list[float] = []
+    with mpmath.workdps(60):
+        for price, strike in zip(prices.tolist(), strikes.tolist(), strict=True):
+            gap = functools.partial(_price_gap, spot, strike, tau, price)
+            root = mpmath.findroot(
+                gap,
+                (mpmath.mpf("1e-8"), mpmath.mpf(20)),
+                solver="bisect",
+                tol=mpmath.mpf("1e-40"),
+                maxsteps=400,
+                verify=False,
+            )
+            roots.append(float(root))
+    return torch.tensor(roots, dtype=torch.float64)
+
+
+def _price_gap(spot: float, strike: float, tau: float, price: float, sigma: Any) -> Any:
+    return _call_by_mpmath(spot, strike, sigma, tau, 0.0, digits=60) - mpmath.mpf(price)
