@@ -1,0 +1,14 @@
+# cosmic-ray's configuration, in the shape `cosmic-ray new-config` writes.
+# `nox -s mutants -- <module>` reads this file and rewrites module-path and
+# test-command into a copy for the module it is given, so those two keys are
+# placeholders. A mutant whose test run outlasts the timeout is counted as
+# killed, so the timeout is set well above a test file's own run time rather
+# than near it.
+[cosmic-ray]
+module-path = "src"
+timeout = 120.0
+excluded-modules = []
+test-command = "uv run pytest"
+
+[cosmic-ray.distributor]
+name = "local"

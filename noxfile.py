@@ -56,6 +56,24 @@ def _sync(session: nox.Session) -> None:
     )
 
 
+def _find_one(session: nox.Session, root: str, name: str) -> Path:
+    """Find the one file with this name at any depth under a directory.
+
+    Args:
+        session: The nox session to report through.
+        root: The directory to search.
+        name: The file name to match.
+
+    Returns:
+        The only match, after the session has ended on none or several.
+    """
+    found = sorted(Path(root).rglob(name))
+    if len(found) != 1:
+        listed = ", ".join(str(path) for path in found) or "none"
+        session.error(f"expected one {root}/**/{name}, found {listed}")
+    return found[0]
+
+
 @nox.session
 def lint(session: nox.Session) -> None:
     """Run the pre-commit hooks over what has changed since HEAD.
@@ -116,6 +134,21 @@ def generate(session: nox.Session) -> None:
     pre-commit exits 1 when a hook changes a file, which is the outcome wanted
     here rather than an error.
 
+    ruff-check exits 1 as well when errors it cannot fix are left, so accepting
+    1 for the rewrite accepted those too. Given the same function name twice,
+    as `demo.baselines.total demo.sums.total`, the ghostwriter assigns to
+    `result_total_demo.baselines`, ruff reported `Found 5 errors (1 fixed, 4
+    remaining)`, and the session still reported success. ruff-check runs once
+    more over the rewritten file, where nothing is left to fix, so the only
+    way it exits 1 there is an error that remains, and that fails the session.
+
+    On Windows the ghostwriter prints CRLF, nox decodes the captured bytes
+    without translating line endings, and a text-mode write then turned each LF
+    into a second CRLF. ruff took the lone CR that led each line for the file's
+    line ending and rewrote every line with it, so the test file held no LF at
+    all, read as one line, and both hooks still passed. The text is normalised
+    to LF and written without translation, the ending .editorconfig asks for.
+
     Args:
         session: The nox session running this.
     """
@@ -137,9 +170,10 @@ def generate(session: nox.Session) -> None:
     if not isinstance(source, str):
         session.error("the ghostwriter printed nothing")
     written = Path("tests", f"test_{module}.py")
-    written.write_text(source, encoding="utf-8")
+    written.write_text(source.replace("\r\n", "\n"), encoding="utf-8", newline="\n")
     for hook in ("ruff-check", "ruff-format"):
         session.run("pre-commit", "run", hook, "--files", str(written), success_codes=[0, 1])
+    session.run("pre-commit", "run", "ruff-check", "--files", str(written))
     session.log(f"wrote {written}")
 
 
@@ -222,11 +256,22 @@ def mutants(session: nox.Session) -> None:
     the first repository to run this it still named a module whose body was one
     call to a standard library function, holding no operator to mutate, and the
     session reported `total jobs: 0` and passed. The module is found under src
-    by glob, so the package name is read from the tree rather than repeated
-    here, and its tests are tests/test_<module>.py by the same convention.
+    by a recursive glob, so neither the package nor a subpackage is named here,
+    and its tests are the test_<module>.py the same glob finds under tests,
+    whether in tests/ itself or in tests/unit/. A name either glob matches
+    twice ends the session rather than being settled by sort order, since one
+    module mutated against another's tests reports survivors no test was
+    written to kill.
     Everything else in mutation.toml, the timeout and the distributor, is read
     from the file, and only these two keys are rewritten, into a copy under the
     session's temporary directory.
+
+    Both paths are written in POSIX form. cosmic-ray splits the test command
+    with shlex in POSIX mode, which reads a backslash as an escape, so on
+    Windows the test path reached pytest with its separator removed, as
+    teststest_mod.py. pytest collected nothing and exited 4, and cosmic-ray
+    counted every mutant as killed, a perfect score for a suite that never
+    ran.
 
     cr-filter-pragma runs between init and exec. It is cosmic-ray's own filter
     for the `# pragma: no mutate` comment, which is how a line records that
@@ -251,14 +296,12 @@ def mutants(session: nox.Session) -> None:
     if not session.posargs:
         session.error("name the module, as `nox -s mutants -- <module>`")
     module = session.posargs[0]
-    sources = sorted(Path("src").glob(f"*/{module}.py"))
-    tests = Path("tests", f"test_{module}.py")
-    if not sources or not tests.is_file():
-        session.error(f"expected src/*/{module}.py and {tests}")
+    source = _find_one(session, "src", f"{module}.py")
+    tests = _find_one(session, "tests", f"test_{module}.py")
 
     config = tomllib.loads(Path(_MUTATION_CONFIG).read_text(encoding="utf-8"))
-    config["cosmic-ray"]["module-path"] = str(sources[0])
-    config["cosmic-ray"]["test-command"] = f"uv run pytest -q -x --timeout=5 {tests}"
+    config["cosmic-ray"]["module-path"] = source.as_posix()
+    config["cosmic-ray"]["test-command"] = f"uv run pytest -q -x --timeout=5 {tests.as_posix()}"
     rendered = Path(session.create_tmp()) / _MUTATION_CONFIG
     rendered.write_text(tomli_w.dumps(config), encoding="utf-8")
 
