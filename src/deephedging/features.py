@@ -9,11 +9,20 @@ never leak into its input.
 """
 
 from dataclasses import dataclass
+from functools import cache
 from typing import Protocol, runtime_checkable
 
 import torch
 
 from deephedging.market.state import MarketState
+
+
+@cache
+def _level_column(
+    codes: tuple[float, ...], n_paths: int, dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
+    column = torch.tensor(codes, dtype=dtype, device=device).repeat(n_paths // len(codes))
+    return column.unsqueeze(-1)
 
 
 @runtime_checkable
@@ -243,6 +252,5 @@ class LevelFeatures:
             Features of shape ``(n_paths, base.n_features + 1)``.
         """
         features = self.base(state, t, tau, position)
-        codes = features.new_tensor(self.codes)
-        column = codes.repeat(features.shape[0] // codes.shape[0])
-        return torch.cat((features, column.unsqueeze(-1)), dim=-1)
+        column = _level_column(self.codes, features.shape[0], features.dtype, features.device)
+        return torch.cat((features, column), dim=-1)
