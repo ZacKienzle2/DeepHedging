@@ -104,7 +104,9 @@ def heston_cf(
     exp_term = torch.exp(-discriminant * tau)
     log_term = torch.log((1.0 - ratio * exp_term) / (1.0 - ratio))
     c_term = (kappa * theta / xi**2) * ((beta - discriminant) * tau - 2.0 * log_term)
-    d_term = ((beta - discriminant) / xi**2) * (1.0 - exp_term) / (1.0 - ratio * exp_term)
+    d_term = (
+        ((beta - discriminant) / xi**2) * (1.0 - exp_term) / (1.0 - ratio * exp_term)
+    )
     return torch.exp(c_term + d_term * v0)
 
 
@@ -139,7 +141,8 @@ def heston_cumulants(
         x * tau * k * decay * (v - t) * (8.0 * k * r - 4.0 * x)
         + k * r * x * (1.0 - decay) * (16.0 * t - 8.0 * v)
         + 2.0 * t * k * tau * (-4.0 * k * r * x + x**2 + 4.0 * k**2)
-        + x**2 * ((t - 2.0 * v) * math.exp(-2.0 * k * tau) + t * (6.0 * decay - 7.0) + 2.0 * v)
+        + x**2
+        * ((t - 2.0 * v) * math.exp(-2.0 * k * tau) + t * (6.0 * decay - 7.0) + 2.0 * v)
         + 8.0 * k**2 * (v - t) * (1.0 - decay)
     ) / (8.0 * k**3)
     return c1, c2

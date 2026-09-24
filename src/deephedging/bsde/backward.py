@@ -139,10 +139,18 @@ def solve_backward(problem: BSDEProblem, config: BackwardConfig) -> BackwardResu
         steps = config.first_iterations if following is None else config.iterations
         loss = torch.zeros(())
         for step in range(steps):
-            noise = base_noise.child(date * stride + step) if base_noise is not None else None
-            generator = noise.torch_generator(config.device) if noise is not None else None
+            noise = (
+                base_noise.child(date * stride + step)
+                if base_noise is not None
+                else None
+            )
+            generator = (
+                noise.torch_generator(config.device) if noise is not None else None
+            )
             draws = torch.randn(
-                (2, config.batch_paths, problem.dim), device=config.device, generator=generator
+                (2, config.batch_paths, problem.dim),
+                device=config.device,
+                generator=generator,
             )
             log_x = drift * time + problem.sigma * math.sqrt(time) * draws[0]
             increment = math.sqrt(dt) * draws[1]

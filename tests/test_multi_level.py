@@ -11,7 +11,9 @@ from deephedging import CVaR, Entropic, MultiLevelRisk
 
 _LEVELS = 4
 _MEASURES = st.lists(
-    st.one_of(st.builds(Entropic, st.floats(0.1, 5.0)), st.builds(CVaR, st.floats(0.5, 0.99))),
+    st.one_of(
+        st.builds(Entropic, st.floats(0.1, 5.0)), st.builds(CVaR, st.floats(0.5, 0.99))
+    ),
     min_size=_LEVELS,
     max_size=_LEVELS,
 ).map(MultiLevelRisk)
@@ -34,7 +36,9 @@ _LOSS = (
 def test_fuzz_multi_level_risk_forward(
     self: MultiLevelRisk, loss: torch.Tensor, weights: torch.Tensor | None
 ) -> None:
-    deephedging.risk.multi_level.MultiLevelRisk.forward(self=self, loss=loss, weights=weights)
+    deephedging.risk.multi_level.MultiLevelRisk.forward(
+        self=self, loss=loss, weights=weights
+    )
 
 
 @given(
@@ -45,4 +49,6 @@ def test_fuzz_multi_level_risk_forward(
 def test_fuzz_multi_level_risk_warm_start(
     self: MultiLevelRisk, loss: torch.Tensor, weights: torch.Tensor | None
 ) -> None:
-    deephedging.risk.multi_level.MultiLevelRisk.warm_start(self=self, loss=loss, weights=weights)
+    deephedging.risk.multi_level.MultiLevelRisk.warm_start(
+        self=self, loss=loss, weights=weights
+    )

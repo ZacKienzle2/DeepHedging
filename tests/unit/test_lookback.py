@@ -8,8 +8,12 @@ from deephedging.instruments import EuropeanCall, EuropeanPut, LookbackCall, Loo
 def _paths(n_steps: int = 20, n_paths: int = 5000, seed: int = 2) -> torch.Tensor:
     generator = torch.Generator()
     generator.manual_seed(seed)
-    increments = 0.02 * torch.randn(n_steps, n_paths, generator=generator, dtype=torch.float64)
-    log_path = torch.cat([torch.zeros(1, n_paths, dtype=torch.float64), increments.cumsum(dim=0)])
+    increments = 0.02 * torch.randn(
+        n_steps, n_paths, generator=generator, dtype=torch.float64
+    )
+    log_path = torch.cat(
+        [torch.zeros(1, n_paths, dtype=torch.float64), increments.cumsum(dim=0)]
+    )
     return 100.0 * torch.exp(log_path)
 
 
@@ -30,7 +34,9 @@ def test_lookback_put_dominates_european_put() -> None:
 
 def test_monotone_increasing_path_matches_european_call() -> None:
     path = torch.linspace(80.0, 120.0, 11, dtype=torch.float64).unsqueeze(1)
-    assert torch.allclose(LookbackCall(strike=100.0)(path), EuropeanCall(strike=100.0)(path))
+    assert torch.allclose(
+        LookbackCall(strike=100.0)(path), EuropeanCall(strike=100.0)(path)
+    )
 
 
 def test_constant_path_pays_intrinsic() -> None:

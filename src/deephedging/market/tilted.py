@@ -92,4 +92,6 @@ class TiltedGBMSimulator:
         out[0] = 0.0
         out[1:] = log_returns
         log_weight = -self.tilt * tilted.sum(dim=0) + self.n_steps * self.tilt**2 / 2.0
-        return MarketState(spot=out.exp_().mul_(self.s0), aux={LOG_WEIGHT_CHANNEL: log_weight})
+        return MarketState(
+            spot=out.exp_().mul_(self.s0), aux={LOG_WEIGHT_CHANNEL: log_weight}
+        )

@@ -55,7 +55,9 @@ def _unconstrain(params: HestonParams) -> torch.Tensor:
     positive = torch.tensor(
         [params.v0, params.kappa, params.theta, params.xi], dtype=torch.float64
     ).clamp(min=1e-8)
-    rho = torch.tensor([params.rho], dtype=torch.float64).clamp(-(_RHO_BOUND**2), _RHO_BOUND**2)
+    rho = torch.tensor([params.rho], dtype=torch.float64).clamp(
+        -(_RHO_BOUND**2), _RHO_BOUND**2
+    )
     return torch.cat((_apply(_POSITIVE.inv, positive), _apply(_CORRELATION.inv, rho)))
 
 
@@ -175,7 +177,10 @@ def calibrate_heston(
 
     raw = _unconstrain(initial).requires_grad_(True)
     optimizer = torch.optim.LBFGS(
-        [raw], lr=settings.lr, max_iter=settings.n_iterations, line_search_fn="strong_wolfe"
+        [raw],
+        lr=settings.lr,
+        max_iter=settings.n_iterations,
+        line_search_fn="strong_wolfe",
     )
     losses: list[float] = []
 
@@ -251,4 +256,6 @@ class HestonAnalyticPricer:
         value = price_surface(
             params.as_tensors(), simulator.s0, strikes, simulator.maturity, self.n_terms
         )
-        return PriceEstimate(value=float(value[0]), standard_error=0.0, provenance="heston-cos")
+        return PriceEstimate(
+            value=float(value[0]), standard_error=0.0, provenance="heston-cos"
+        )

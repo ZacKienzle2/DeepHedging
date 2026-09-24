@@ -30,7 +30,9 @@ def _ensure_msvc_on_path() -> None:
     if os.name != "nt" or shutil.which("cl") is not None:
         return
     studio = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
-    candidates = sorted(studio.glob("Microsoft Visual Studio/*/*/VC/Tools/MSVC/*/bin/Hostx64/x64"))
+    candidates = sorted(
+        studio.glob("Microsoft Visual Studio/*/*/VC/Tools/MSVC/*/bin/Hostx64/x64")
+    )
     if candidates:
         os.environ["PATH"] = f"{candidates[-1]}{os.pathsep}{os.environ['PATH']}"
 
@@ -146,7 +148,9 @@ class CudaGBMSimulator:
         )
         return MarketState(spot=spot)
 
-    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+    def simulate_with_offset(
+        self, n_paths: int, seed: int, offset: torch.Tensor
+    ) -> MarketState:
         """Simulates GBM paths reading the stream offset from the device.
 
         The kernel reads the shifted Philox subsequence from the offset
@@ -201,7 +205,9 @@ class CudaGBMSimulator:
             spec.seed,
             spec.stream,
         )
-        return PathFolds(terminal=terminal, running_max=running_max, running_min=running_min)
+        return PathFolds(
+            terminal=terminal, running_max=running_max, running_min=running_min
+        )
 
 
 @dataclass(frozen=True)
@@ -289,7 +295,9 @@ class CudaHestonSimulator:
         )
         return MarketState(spot=spot, aux={"variance": variance})
 
-    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+    def simulate_with_offset(
+        self, n_paths: int, seed: int, offset: torch.Tensor
+    ) -> MarketState:
         """Simulates Heston paths reading the stream offset from the device.
 
         The kernel reads the shifted Philox subsequence from the offset
@@ -352,7 +360,9 @@ class CudaHestonSimulator:
             spec.seed,
             spec.stream,
         )
-        return PathFolds(terminal=terminal, running_max=running_max, running_min=running_min)
+        return PathFolds(
+            terminal=terminal, running_max=running_max, running_min=running_min
+        )
 
 
 @dataclass(frozen=True)
@@ -441,7 +451,9 @@ class CudaMertonSimulator:
         )
         return MarketState(spot=spot, aux={"jumps": jumps})
 
-    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+    def simulate_with_offset(
+        self, n_paths: int, seed: int, offset: torch.Tensor
+    ) -> MarketState:
         """Simulates Merton paths reading the stream offset from the device.
 
         The kernel reads the shifted Philox subsequence from the offset
@@ -502,4 +514,6 @@ class CudaMertonSimulator:
             spec.seed,
             spec.stream,
         )
-        return PathFolds(terminal=terminal, running_max=running_max, running_min=running_min)
+        return PathFolds(
+            terminal=terminal, running_max=running_max, running_min=running_min
+        )

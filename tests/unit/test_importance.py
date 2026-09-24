@@ -14,7 +14,9 @@ _SIGMA, _MATURITY, _STEPS = 0.2, 0.25, 20
 
 
 def _tilted(tilt: float) -> TiltedGBMSimulator:
-    return TiltedGBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS, tilt=tilt)
+    return TiltedGBMSimulator(
+        s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS, tilt=tilt
+    )
 
 
 def test_reweighted_martingale_mean() -> None:
@@ -42,9 +44,9 @@ def test_replay_and_zero_tilt_matches_plain_gbm() -> None:
 
 def test_weighted_cvar_objective_is_unbiased() -> None:
     payoff = EuropeanCall(strike=100.0)
-    plain_state = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS).simulate(
-        400_000, noise=NoiseSpec(seed=197)
-    )
+    plain_state = GBMSimulator(
+        s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS
+    ).simulate(400_000, noise=NoiseSpec(seed=197))
     plain_loss = payoff(plain_state.spot).to(torch.float64)
 
     tilted_state = _tilted(0.4).simulate(400_000, noise=NoiseSpec(seed=199))
@@ -62,9 +64,9 @@ def test_weighted_cvar_objective_is_unbiased() -> None:
 def test_tilt_enriches_the_tail() -> None:
     alpha = 0.99
     payoff = EuropeanCall(strike=100.0)
-    plain_state = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS).simulate(
-        200_000, noise=NoiseSpec(seed=211)
-    )
+    plain_state = GBMSimulator(
+        s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS
+    ).simulate(200_000, noise=NoiseSpec(seed=211))
     plain_loss = payoff(plain_state.spot)
     threshold = torch.quantile(plain_loss.to(torch.float64), alpha)
 
@@ -78,9 +80,9 @@ def test_tilt_enriches_the_tail() -> None:
 def test_tilt_reduces_tail_estimator_variance() -> None:
     alpha = 0.99
     payoff = EuropeanCall(strike=100.0)
-    plain_state = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS).simulate(
-        400_000, noise=NoiseSpec(seed=223)
-    )
+    plain_state = GBMSimulator(
+        s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=_STEPS
+    ).simulate(400_000, noise=NoiseSpec(seed=223))
     plain_loss = payoff(plain_state.spot).to(torch.float64)
     threshold = torch.quantile(plain_loss, alpha)
     plain_excess = torch.relu(plain_loss - threshold)

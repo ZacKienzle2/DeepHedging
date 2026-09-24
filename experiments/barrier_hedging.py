@@ -145,7 +145,9 @@ def main() -> None:
     results_path, completed = open_store(RESULTS, arguments.smoke)
     simulator = make_simulator(arguments.device, arguments.fused)
     payoff = UpAndOutCall(strike=STRIKE, barrier=BARRIER)
-    estimate = MonteCarloPricer(n_paths=premium_paths, seed=PREMIUM_SEED).price(payoff, simulator)
+    estimate = MonteCarloPricer(n_paths=premium_paths, seed=PREMIUM_SEED).price(
+        payoff, simulator
+    )
     premium = estimate.value
     print(f"barrier premium {premium:.4f} (se {estimate.standard_error:.4f})")
 

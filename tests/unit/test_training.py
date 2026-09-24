@@ -25,7 +25,9 @@ def test_trained_policy_beats_no_hedge() -> None:
     premium = float(bs_call_price(100.0, strike, sigma, maturity))
     policy = FeedForwardPolicy(hidden_sizes=(16, 16))
     config = TrainConfig(n_iterations=300, batch_paths=1024, lr=2e-3, seed=4)
-    result = train(sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config, premium=premium)
+    result = train(
+        sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config, premium=premium
+    )
 
     eval_state = sim.simulate(50_000, noise=NoiseSpec(seed=99))
     with torch.no_grad():
@@ -46,12 +48,16 @@ def test_training_is_reproducible_with_seed() -> None:
     sigma, maturity, strike = 0.2, 0.25, 100.0
     sim = GBMSimulator(s0=100.0, sigma=sigma, maturity=maturity, n_steps=5)
     payoff = EuropeanCall(strike=strike)
-    config = TrainConfig(n_iterations=20, batch_paths=256, seed=8, liquidate_terminal=True)
+    config = TrainConfig(
+        n_iterations=20, batch_paths=256, seed=8, liquidate_terminal=True
+    )
 
     def run() -> list[float]:
         torch.manual_seed(42)
         policy = FeedForwardPolicy(hidden_sizes=(8,))
-        result = train(sim, policy, payoff, ProportionalCost(rate=1e-3), CVaR(alpha=0.9), config)
+        result = train(
+            sim, policy, payoff, ProportionalCost(rate=1e-3), CVaR(alpha=0.9), config
+        )
         return result.losses
 
     first, second = run(), run()
@@ -79,7 +85,9 @@ def test_compile_and_checkpoint_mutually_exclusive() -> None:
     with pytest.raises(
         ValueError, match="compile_policy and checkpoint_steps are mutually exclusive"
     ):
-        TrainConfig(n_iterations=1, batch_paths=8, compile_policy=True, checkpoint_steps=True)
+        TrainConfig(
+            n_iterations=1, batch_paths=8, compile_policy=True, checkpoint_steps=True
+        )
 
 
 def test_grad_clip_norm_rejects_nonpositive() -> None:
@@ -111,10 +119,14 @@ def test_cosine_schedule_improves_objective() -> None:
     sim = GBMSimulator(s0=100.0, sigma=sigma, maturity=maturity, n_steps=10)
     payoff = EuropeanCall(strike=strike)
     premium = float(bs_call_price(100.0, strike, sigma, maturity))
-    config = TrainConfig(n_iterations=200, batch_paths=1024, lr=2e-3, seed=4, lr_schedule="cosine")
+    config = TrainConfig(
+        n_iterations=200, batch_paths=1024, lr=2e-3, seed=4, lr_schedule="cosine"
+    )
     torch.manual_seed(21)
     policy = FeedForwardPolicy(hidden_sizes=(16, 16))
-    result = train(sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config, premium=premium)
+    result = train(
+        sim, policy, payoff, NoCost(), CVaR(alpha=0.9), config, premium=premium
+    )
     early = sum(result.losses[:20]) / 20
     late = sum(result.losses[-20:]) / 20
     assert late < early

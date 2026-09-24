@@ -68,15 +68,21 @@ def test_regenerated_losses_match_stored_bitwise() -> None:
 def test_regeneration_nests_with_step_checkpointing() -> None:
     stored_losses, _ = _losses_and_grads(regenerate=False)
     nested_losses, _ = _losses_and_grads(regenerate=True, checkpoint_steps=True)
-    assert all(abs(a - b) < 1e-6 for a, b in zip(stored_losses, nested_losses, strict=True))
+    assert all(
+        abs(a - b) < 1e-6 for a, b in zip(stored_losses, nested_losses, strict=True)
+    )
 
 
 def test_regeneration_reproduces_importance_weights() -> None:
     def run(regenerate: bool) -> list[float]:
         torch.manual_seed(43)
-        sim = TiltedGBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=6, tilt=0.4)
+        sim = TiltedGBMSimulator(
+            s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=6, tilt=0.4
+        )
         policy = FeedForwardPolicy(hidden_sizes=(8,))
-        config = TrainConfig(n_iterations=3, batch_paths=512, seed=9, regenerate_paths=regenerate)
+        config = TrainConfig(
+            n_iterations=3, batch_paths=512, seed=9, regenerate_paths=regenerate
+        )
         return train(
             sim,
             policy,
@@ -103,7 +109,9 @@ def test_regeneration_reproduces_aux_channels() -> None:
             n_steps=6,
         )
         policy = FeedForwardPolicy(n_features=4, hidden_sizes=(8,))
-        config = TrainConfig(n_iterations=3, batch_paths=512, seed=10, regenerate_paths=regenerate)
+        config = TrainConfig(
+            n_iterations=3, batch_paths=512, seed=10, regenerate_paths=regenerate
+        )
         return train(
             sim,
             policy,
@@ -127,7 +135,9 @@ def test_regeneration_matches_on_the_cuda_backend() -> None:
         torch.manual_seed(45)
         sim = CudaGBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=8)
         policy = FeedForwardPolicy(hidden_sizes=(8, 8)).to("cuda")
-        config = TrainConfig(n_iterations=3, batch_paths=4096, seed=11, regenerate_paths=regenerate)
+        config = TrainConfig(
+            n_iterations=3, batch_paths=4096, seed=11, regenerate_paths=regenerate
+        )
         return train(
             sim,
             policy,
@@ -179,7 +189,9 @@ def test_evaluation_never_routes_through_regeneration() -> None:
     torch.manual_seed(47)
     sim = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=6)
     policy = FeedForwardPolicy(hidden_sizes=(8,))
-    config = TrainConfig(n_iterations=2, batch_paths=256, seed=13, regenerate_paths=True)
+    config = TrainConfig(
+        n_iterations=2, batch_paths=256, seed=13, regenerate_paths=True
+    )
     train(
         sim,
         policy,
@@ -191,7 +203,9 @@ def test_evaluation_never_routes_through_regeneration() -> None:
 
     state = sim.simulate(1024, noise=NoiseSpec(seed=99))
     with torch.no_grad():
-        pnl = hedge_pnl(state, policy, EuropeanCall(strike=_STRIKE), ProportionalCost(rate=1e-3))
+        pnl = hedge_pnl(
+            state, policy, EuropeanCall(strike=_STRIKE), ProportionalCost(rate=1e-3)
+        )
     assert pnl.shape == (1024,)
     assert torch.isfinite(pnl).all()
 
@@ -204,5 +218,9 @@ def test_regeneration_requires_a_seed() -> None:
 def test_regeneration_excludes_graph_capture() -> None:
     with pytest.raises(ValueError, match="mutually exclusive"):
         TrainConfig(
-            n_iterations=1, batch_paths=8, seed=1, regenerate_paths=True, graph_episode=True
+            n_iterations=1,
+            batch_paths=8,
+            seed=1,
+            regenerate_paths=True,
+            graph_episode=True,
         )

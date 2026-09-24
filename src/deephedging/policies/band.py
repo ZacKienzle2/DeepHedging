@@ -105,7 +105,9 @@ class NoTransactionBandPolicy(HedgePolicy):
         log_moneyness = features[..., 0] - self.log_strike_ratio
         remaining = torch.clamp(features[..., 1] * self.maturity, min=1e-8)
         scale = self.sigma * torch.sqrt(remaining)
-        delta = torch.special.ndtr((log_moneyness + 0.5 * self.sigma**2 * remaining) / scale)
+        delta = torch.special.ndtr(
+            (log_moneyness + 0.5 * self.sigma**2 * remaining) / scale
+        )
         market = features.index_select(-1, cast("torch.Tensor", self.market_columns))
         widths = nn.functional.softplus(self.net(market))
         return delta - widths[..., 0], delta + widths[..., 1]

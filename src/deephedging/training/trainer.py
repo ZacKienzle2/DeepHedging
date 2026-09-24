@@ -154,7 +154,10 @@ class TrainConfig:
         if self.grad_clip_norm is not None and self.grad_clip_norm <= 0.0:
             msg = f"grad_clip_norm must be positive, got {self.grad_clip_norm}"
             raise ValueError(msg)
-        if self.lr_schedule is not None and self.lr_schedule not in ("cosine", "linear"):
+        if self.lr_schedule is not None and self.lr_schedule not in (
+            "cosine",
+            "linear",
+        ):
             msg = f"lr_schedule must be 'cosine' or 'linear', got {self.lr_schedule!r}"
             raise ValueError(msg)
 
@@ -162,7 +165,9 @@ class TrainConfig:
 class _OffsetSimulator(Protocol):
     """Simulator whose kernel reads the Philox subsequence from the device."""
 
-    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+    def simulate_with_offset(
+        self, n_paths: int, seed: int, offset: torch.Tensor
+    ) -> MarketState:
         """Simulates a batch addressed by the device-resident offset."""
         ...
 
@@ -213,7 +218,9 @@ def _optimizer(
     if risk_params:
         risk_lr = config.risk_lr if config.risk_lr is not None else 10.0 * config.lr
         groups.append({"params": risk_params, "lr": rate(risk_lr)})
-    return torch.optim.Adam(groups, fused=device.type == "cuda", capturable=config.graph_episode)
+    return torch.optim.Adam(
+        groups, fused=device.type == "cuda", capturable=config.graph_episode
+    )
 
 
 def _schedule(
@@ -386,7 +393,8 @@ def train(
             feature_map=feature_map,
             amp=config.amp,
         )
-        return risk_measure(-pnl, weights=_importance_weights(state))
+        loss: torch.Tensor = risk_measure(-pnl, weights=_importance_weights(state))
+        return loss
 
     def descend(loss: torch.Tensor) -> torch.Tensor:
         loss.backward()
@@ -399,10 +407,7 @@ def train(
         def from_noise(*_parameters: torch.Tensor) -> torch.Tensor:
             return episode_loss(batch_state(index))
 
-        return cast(
-            "torch.Tensor",
-            checkpoint(from_noise, *policy_params, *risk_params, use_reentrant=False),
-        )
+        return checkpoint(from_noise, *policy_params, *risk_params, use_reentrant=False)
 
     graph: torch.cuda.CUDAGraph | None = None
     static_loss = torch.empty(0)
@@ -427,7 +432,9 @@ def train(
 
             def captured() -> torch.Tensor:
                 spot, *aux = static_channels
-                state = MarketState(spot=spot, aux=dict(zip(aux_keys, aux, strict=True)))
+                state = MarketState(
+                    spot=spot, aux=dict(zip(aux_keys, aux, strict=True))
+                )
                 return descend(episode_loss(state))
 
         graph, static_loss = _capture(captured, clip_params, optimizer)

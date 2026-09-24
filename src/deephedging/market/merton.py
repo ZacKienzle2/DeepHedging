@@ -94,10 +94,14 @@ class MertonSimulator:
         diffusion = self.sigma * dt**0.5
 
         shape = (self.n_steps, n_paths)
-        z_diffusion = torch.randn(shape, dtype=self.dtype, device=self.device, generator=generator)
+        z_diffusion = torch.randn(
+            shape, dtype=self.dtype, device=self.device, generator=generator
+        )
         rates = torch.full(shape, rate, dtype=self.dtype, device=self.device)
         counts = torch.poisson(rates, generator=generator)
-        z_jump = torch.randn(shape, dtype=self.dtype, device=self.device, generator=generator)
+        z_jump = torch.randn(
+            shape, dtype=self.dtype, device=self.device, generator=generator
+        )
 
         jump_sum = self.jump_mean * counts + self.jump_vol * torch.sqrt(counts) * z_jump
         increments = drift + diffusion * z_diffusion + jump_sum
@@ -107,4 +111,6 @@ class MertonSimulator:
         out[1:] = log_returns
         cumulative_jumps = out.new_zeros((self.n_steps + 1, n_paths))
         cumulative_jumps[1:] = torch.cumsum(counts, dim=0)
-        return MarketState(spot=out.exp_().mul_(self.s0), aux={"jumps": cumulative_jumps})
+        return MarketState(
+            spot=out.exp_().mul_(self.s0), aux={"jumps": cumulative_jumps}
+        )

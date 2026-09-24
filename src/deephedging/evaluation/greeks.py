@@ -5,7 +5,9 @@ from dataclasses import dataclass
 
 import torch
 
-PriceFunction = Callable[[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
+PriceFunction = Callable[
+    [torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
+]
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,7 @@ def european_greeks(
 
     Differentiating the pricing map is exact to machine precision, where a
     finite-difference bump trades truncation error against catastrophic
-    cancellation and has to be retuned for each Greek and each regime. One
+    cancellation and has to be re-tuned for each Greek and each regime. One
     reverse sweep returns all four first-order Greeks, the adjoint mode that
     Capriotti (2011) shows costs a small bounded multiple of one pricing call
     whatever the number of sensitivities, and a second sweep over the first
@@ -65,7 +67,8 @@ def european_greeks(
         The :class:`Greeks` evaluated elementwise on the broadcast inputs.
     """
     spot_t, sigma_t, tau_t, rate_t = (
-        torch.as_tensor(value, dtype=torch.float64) for value in (spot, sigma, tau, rate)
+        torch.as_tensor(value, dtype=torch.float64)
+        for value in (spot, sigma, tau, rate)
     )
     spot_v, sigma_v, tau_v, rate_v = (
         tensor.clone().requires_grad_(True)

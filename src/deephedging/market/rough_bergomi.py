@@ -14,11 +14,17 @@ from deephedging.market.state import MarketState
 def _volterra_ratio(hurst: float, x: float) -> float:
     gamma = 0.5 - hurst
     return float(
-        2.0 * hurst * x**-gamma / (1.0 - gamma) * mpmath.hyp2f1(1.0, gamma, 2.0 - gamma, 1.0 / x)
+        2.0
+        * hurst
+        * x**-gamma
+        / (1.0 - gamma)
+        * mpmath.hyp2f1(1.0, gamma, 2.0 - gamma, 1.0 / x)
     )
 
 
-def rough_bergomi_factor(hurst: float, rho: float, maturity: float, n_steps: int) -> torch.Tensor:
+def rough_bergomi_factor(
+    hurst: float, rho: float, maturity: float, n_steps: int
+) -> torch.Tensor:
     """Cholesky factor of the joint law of the Volterra process and price driver.
 
     Builds the covariance of Bayer, Friz and Gatheral (2016, Section 4) on the
@@ -72,9 +78,11 @@ def _unit_factor(hurst: float, rho: float, n_steps: int) -> torch.Tensor:
     cross = scale * (grid[:, None] ** (hurst + 0.5) - lag ** (hurst + 0.5))
     driver = torch.minimum(grid[:, None], grid)
     covariance = torch.cat(
-        (torch.cat((volterra, cross), dim=1), torch.cat((cross.T, driver), dim=1)), dim=0
+        (torch.cat((volterra, cross), dim=1), torch.cat((cross.T, driver), dim=1)),
+        dim=0,
     )
-    return torch.linalg.cholesky(covariance)
+    factor: torch.Tensor = torch.linalg.cholesky(covariance)
+    return factor
 
 
 @dataclass(frozen=True)
@@ -161,15 +169,21 @@ class RoughBergomiSimulator:
         paths = factor @ normals
         volterra, driver = paths[: self.n_steps], paths[self.n_steps :]
         dt = self.maturity / self.n_steps
-        times = torch.arange(1, self.n_steps + 1, dtype=torch.float64, device=self.device) * dt
+        times = (
+            torch.arange(1, self.n_steps + 1, dtype=torch.float64, device=self.device)
+            * dt
+        )
         variance = volterra.new_empty((self.n_steps + 1, n_paths))
         variance[0] = self.xi0
         variance[1:] = self.xi0 * torch.exp(
-            self.eta * volterra - 0.5 * self.eta**2 * times[:, None] ** (2.0 * self.hurst)
+            self.eta * volterra
+            - 0.5 * self.eta**2 * times[:, None] ** (2.0 * self.hurst)
         )
         increments = torch.diff(driver, dim=0, prepend=torch.zeros_like(driver[:1]))
         held = variance[:-1]
         log_returns = torch.cumsum(held.sqrt() * increments - 0.5 * held * dt, dim=0)
         log_spot = torch.cat((torch.zeros_like(log_returns[:1]), log_returns))
         spot = self.s0 * torch.exp(log_spot)
-        return MarketState(spot=spot.to(self.dtype), aux={"variance": variance.to(self.dtype)})
+        return MarketState(
+            spot=spot.to(self.dtype), aux={"variance": variance.to(self.dtype)}
+        )

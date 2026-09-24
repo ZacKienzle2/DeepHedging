@@ -3,7 +3,9 @@
 import torch
 
 
-def weighted_quantile(values: torch.Tensor, weights: torch.Tensor, level: float) -> torch.Tensor:
+def weighted_quantile(
+    values: torch.Tensor, weights: torch.Tensor, level: float
+) -> torch.Tensor:
     """Lower quantile of a weighted empirical distribution.
 
     The smallest value whose cumulative normalised weight reaches ``level``.
@@ -60,13 +62,17 @@ def expected_shortfall(
     if weights is None:
         var = torch.quantile(loss, alpha, dim=-1, keepdim=True)
         excess = torch.relu(loss - var).mean(dim=-1)
-        return torch.minimum(var.squeeze(-1) + excess / (1.0 - alpha), loss.amax(dim=-1))
+        return torch.minimum(
+            var.squeeze(-1) + excess / (1.0 - alpha), loss.amax(dim=-1)
+        )
     var = weighted_quantile(loss, weights, alpha)
     excess = weights * torch.relu(loss - var)
     return torch.minimum(var + excess.mean() / (1.0 - alpha), loss.max())
 
 
-def pnl_summary(pnl: torch.Tensor, alphas: tuple[float, ...] = (0.95, 0.99)) -> dict[str, float]:
+def pnl_summary(
+    pnl: torch.Tensor, alphas: tuple[float, ...] = (0.95, 0.99)
+) -> dict[str, float]:
     """Summarises a hedged PnL distribution.
 
     Args:

@@ -41,21 +41,34 @@ def test_martingale_property() -> None:
     at_zero = heston_cf(torch.tensor([0.0], dtype=torch.float64), _TAU, *tensors)
     assert torch.allclose(at_zero, torch.ones_like(at_zero))
     at_minus_i = heston_cf(torch.tensor([-1j], dtype=torch.complex128), _TAU, *tensors)
-    assert torch.allclose(at_minus_i.real, torch.ones(1, dtype=torch.float64), atol=1e-12)
-    assert torch.allclose(at_minus_i.imag, torch.zeros(1, dtype=torch.float64), atol=1e-12)
+    assert torch.allclose(
+        at_minus_i.real, torch.ones(1, dtype=torch.float64), atol=1e-12
+    )
+    assert torch.allclose(
+        at_minus_i.imag, torch.zeros(1, dtype=torch.float64), atol=1e-12
+    )
 
 
 def test_cos_price_matches_monte_carlo() -> None:
     strikes = torch.tensor([80.0, 90.0, 100.0, 110.0, 120.0], dtype=torch.float64)
     cos_prices = _price(strikes)
     sim = HestonSimulator(
-        s0=_S0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=_TAU, n_steps=200
+        s0=_S0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.5,
+        rho=-0.7,
+        maturity=_TAU,
+        n_steps=200,
     )
     for strike, cos_value in zip(strikes.tolist(), cos_prices.tolist(), strict=True):
         estimate = MonteCarloPricer(n_paths=400_000, seed=83).price(
             EuropeanCall(strike=strike), sim
         )
-        assert abs(cos_value - estimate.value) < max(3.0 * estimate.standard_error, 0.03)
+        assert abs(cos_value - estimate.value) < max(
+            3.0 * estimate.standard_error, 0.03
+        )
 
 
 def test_degenerate_limit_recovers_black_scholes() -> None:

@@ -37,7 +37,9 @@ class Entropic(RiskMeasure):
             raise ValueError(msg)
         self.risk_aversion = risk_aversion
 
-    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Evaluates the entropic risk of a loss sample.
 
         Args:

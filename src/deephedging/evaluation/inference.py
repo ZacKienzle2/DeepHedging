@@ -155,7 +155,10 @@ def paired_bootstrap(
 
 
 def _resampled(
-    metric: MetricFunction, samples: tuple[torch.Tensor, ...], n_resamples: int, seed: int
+    metric: MetricFunction,
+    samples: tuple[torch.Tensor, ...],
+    n_resamples: int,
+    seed: int,
 ) -> list[torch.Tensor]:
     n_paths = samples[0].shape[0]
     device = samples[0].device
@@ -164,7 +167,9 @@ def _resampled(
     chunks: list[list[torch.Tensor]] = [[] for _ in samples]
     for start in range(0, n_resamples, rows):
         count = min(rows, n_resamples - start)
-        draw = torch.randint(n_paths, (count, n_paths), generator=generator, device=device)
+        draw = torch.randint(
+            n_paths, (count, n_paths), generator=generator, device=device
+        )
         for chunk, sample in zip(chunks, samples, strict=True):
             values = metric(sample[draw])
             if values.shape != (count,):

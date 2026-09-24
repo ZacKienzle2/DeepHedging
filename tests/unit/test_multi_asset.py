@@ -10,7 +10,12 @@ from deephedging import CVaR, MultiAssetFeatures, TrainConfig, train
 from deephedging.evaluation import expected_shortfall
 from deephedging.frictions import NoCost, ProportionalCost
 from deephedging.instruments import BasketCall, GeometricBasketCall
-from deephedging.market import CorrelatedGBMSimulator, GBMSimulator, MarketState, NoiseSpec
+from deephedging.market import (
+    CorrelatedGBMSimulator,
+    GBMSimulator,
+    MarketState,
+    NoiseSpec,
+)
 from deephedging.policies import FeedForwardPolicy
 from deephedging.policies.base import HedgePolicy
 from deephedging.pricing import MonteCarloPricer
@@ -26,7 +31,11 @@ _SIGMAS = (0.2, 0.25, 0.3)
 
 def _simulator(n_steps: int = 25) -> CorrelatedGBMSimulator:
     return CorrelatedGBMSimulator(
-        s0=100.0, sigmas=_SIGMAS, correlation=_CORRELATION, maturity=1.0, n_steps=n_steps
+        s0=100.0,
+        sigmas=_SIGMAS,
+        correlation=_CORRELATION,
+        maturity=1.0,
+        n_steps=n_steps,
     )
 
 
@@ -47,7 +56,8 @@ def test_single_asset_matches_gbm_bitwise() -> None:
     single = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=20)
     noise = NoiseSpec(seed=43)
     assert torch.equal(
-        multi.simulate(256, noise=noise).spot.squeeze(-1), single.simulate(256, noise=noise).spot
+        multi.simulate(256, noise=noise).spot.squeeze(-1),
+        single.simulate(256, noise=noise).spot,
     )
 
 
@@ -55,7 +65,10 @@ def test_empirical_correlation_recovers_target() -> None:
     sim = _simulator(n_steps=1)
     log_returns = torch.cat(
         [
-            torch.log(sim.simulate(400_000, noise=NoiseSpec(seed=47).child(index)).spot[-1] / 100.0)
+            torch.log(
+                sim.simulate(400_000, noise=NoiseSpec(seed=47).child(index)).spot[-1]
+                / 100.0
+            )
             for index in range(3)
         ]
     )
@@ -189,7 +202,12 @@ def test_multi_asset_training_beats_no_hedge() -> None:
     eval_state = sim.simulate(50_000, noise=NoiseSpec(seed=73))
     with torch.no_grad():
         hedged = hedge_pnl(
-            eval_state, policy, payoff, NoCost(), premium=premium, feature_map=feature_map
+            eval_state,
+            policy,
+            payoff,
+            NoCost(),
+            premium=premium,
+            feature_map=feature_map,
         )
     unhedged = premium - payoff(eval_state.spot)
     assert float(expected_shortfall(hedged, alpha=0.9)) < 0.6 * float(
@@ -200,7 +218,11 @@ def test_multi_asset_training_beats_no_hedge() -> None:
 def test_invalid_correlation_rejected() -> None:
     with pytest.raises(ValueError, match="correlation must be 2x2"):
         CorrelatedGBMSimulator(
-            s0=100.0, sigmas=(0.2, 0.3), correlation=((1.0, 0.5),), maturity=1.0, n_steps=5
+            s0=100.0,
+            sigmas=(0.2, 0.3),
+            correlation=((1.0, 0.5),),
+            maturity=1.0,
+            n_steps=5,
         )
     with pytest.raises(ValueError, match="correlation must be symmetric"):
         CorrelatedGBMSimulator(

@@ -89,16 +89,26 @@ class BlackScholesPricer:
             raise ValueError(msg)
         if isinstance(payoff, EuropeanCall):
             value = bs_call_price(
-                simulator.s0, payoff.strike, simulator.sigma, simulator.maturity, self.rate
+                simulator.s0,
+                payoff.strike,
+                simulator.sigma,
+                simulator.maturity,
+                self.rate,
             )
         elif isinstance(payoff, EuropeanPut):
             value = bs_put_price(
-                simulator.s0, payoff.strike, simulator.sigma, simulator.maturity, self.rate
+                simulator.s0,
+                payoff.strike,
+                simulator.sigma,
+                simulator.maturity,
+                self.rate,
             )
         else:
             msg = f"no closed form for {type(payoff).__name__}"
             raise TypeError(msg)
-        return PriceEstimate(value=float(value), standard_error=0.0, provenance="black-scholes")
+        return PriceEstimate(
+            value=float(value), standard_error=0.0, provenance="black-scholes"
+        )
 
 
 def _payoff_from_folds(payoff: Payoff, folds: PathFolds) -> torch.Tensor | None:

@@ -32,14 +32,23 @@ def test_estimate_carries_provenance() -> None:
     assert isinstance(estimate, PriceEstimate)
     assert estimate.provenance == "black-scholes"
     assert (
-        MonteCarloPricer(n_paths=1000).price(EuropeanCall(strike=100.0), _gbm()).provenance
+        MonteCarloPricer(n_paths=1000)
+        .price(EuropeanCall(strike=100.0), _gbm())
+        .provenance
         == "monte-carlo"
     )
 
 
 def test_closed_form_rejects_out_of_scope() -> None:
     heston = HestonSimulator(
-        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=1.0, n_steps=10
+        s0=100.0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.5,
+        rho=-0.7,
+        maturity=1.0,
+        n_steps=10,
     )
     with pytest.raises(TypeError, match="closed form requires GBMSimulator"):
         BlackScholesPricer().price(EuropeanCall(strike=100.0), heston)
@@ -49,7 +58,14 @@ def test_closed_form_rejects_out_of_scope() -> None:
 
 def test_monte_carlo_prices_any_payoff_under_any_model() -> None:
     heston = HestonSimulator(
-        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=1.0, n_steps=50
+        s0=100.0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.5,
+        rho=-0.7,
+        maturity=1.0,
+        n_steps=50,
     )
     barrier = UpAndOutCall(strike=100.0, barrier=120.0)
     vanilla = EuropeanCall(strike=100.0)
@@ -64,13 +80,17 @@ def test_nonzero_rate_backends_agree() -> None:
     drifted = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=50, mu=rate)
     payoff = EuropeanCall(strike=100.0)
     closed = BlackScholesPricer(rate=rate).price(payoff, drifted)
-    sampled = MonteCarloPricer(n_paths=400_000, seed=151, rate=rate).price(payoff, drifted)
+    sampled = MonteCarloPricer(n_paths=400_000, seed=151, rate=rate).price(
+        payoff, drifted
+    )
     assert abs(closed.value - sampled.value) < 3.0 * sampled.standard_error
 
 
 def test_closed_form_rejects_drift_mismatch() -> None:
     drifted = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=10, mu=0.05)
-    with pytest.raises(ValueError, match=r"risk-neutral pricing needs simulator drift 0\.0"):
+    with pytest.raises(
+        ValueError, match=r"risk-neutral pricing needs simulator drift 0\.0"
+    ):
         BlackScholesPricer(rate=0.0).price(EuropeanCall(strike=100.0), drifted)
 
 

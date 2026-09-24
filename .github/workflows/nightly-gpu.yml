@@ -45,12 +45,14 @@ jobs:
       - name: Install the CUDA build of torch on Linux
         if: runner.os == 'Linux'
         run: >-
-          uv pip install --reinstall "torch==$(uv run python -c 'import torch; print(torch.__version__.split("+")[0])')"
-          --index-url https://download.pytorch.org/whl/cu130
+          uv pip install --reinstall "torch==$(uv run python -c 'import torch;
+          print(torch.__version__.split("+")[0])')" --index-url
+          https://download.pytorch.org/whl/cu130
 
       - name: Require a CUDA device
         run:
-          uv run python -c "import torch; assert torch.cuda.is_available(), 'the GPU lane must fail rather than skip'"
+          uv run python -c "import torch; assert torch.cuda.is_available(), 'the
+          GPU lane must fail rather than skip'"
 
       - name: GPU tests
         run: uv run pytest -m gpu --benchmark-skip
@@ -59,5 +61,6 @@ jobs:
         shell: bash
         run: >-
           uv run pytest -m gpu --benchmark-only --benchmark-autosave
-          --benchmark-storage="file://$HOME/.cache/deephedging/benchmarks" --benchmark-compare
-          --benchmark-compare-fail=median:15% -W ignore::pytest_benchmark.logger.PytestBenchmarkWarning
+          --benchmark-storage="file://$HOME/.cache/deephedging/benchmarks"
+          --benchmark-compare --benchmark-compare-fail=median:15% -W
+          ignore::pytest_benchmark.logger.PytestBenchmarkWarning

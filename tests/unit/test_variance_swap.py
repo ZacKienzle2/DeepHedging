@@ -31,7 +31,9 @@ def _heston(maturity: float = 0.25, n_steps: int = 30) -> HestonSimulator:
 def _simulator(
     maturity: float = 0.25, n_steps: int = 30, vs_maturity: float = 1.0
 ) -> HestonVarianceSwapSimulator:
-    return HestonVarianceSwapSimulator(heston=_heston(maturity, n_steps), vs_maturity=vs_maturity)
+    return HestonVarianceSwapSimulator(
+        heston=_heston(maturity, n_steps), vs_maturity=vs_maturity
+    )
 
 
 def test_shape_initial_values_and_replay() -> None:
@@ -91,7 +93,9 @@ def test_swap_value_recomputes_from_grid() -> None:
     accrued = (0.5 * dt * (variance[:t] + variance[1 : t + 1])).sum(dim=0)
     remaining = sim.vs_maturity - t * dt
     decay = (1.0 - math.exp(-_KAPPA * remaining)) / _KAPPA
-    expected = (accrued + (variance[t] - _THETA) * decay + _THETA * remaining) / sim.vs_maturity
+    expected = (
+        accrued + (variance[t] - _THETA) * decay + _THETA * remaining
+    ) / sim.vs_maturity
     assert torch.allclose(state.spot[t, :, 1], expected, atol=1e-6)
 
 
@@ -123,7 +127,9 @@ def test_per_asset_cost_rates_apply_on_the_trailing_axis() -> None:
     trade = torch.tensor([[2.0, -10.0], [0.0, 4.0]])
     price = torch.tensor([[100.0, 0.04], [100.0, 0.04]])
     cost = PerAssetProportionalCost(rates=(1e-3, 5e-2))
-    expected = torch.tensor([[1e-3 * 100.0 * 2.0, 5e-2 * 0.04 * 10.0], [0.0, 5e-2 * 0.04 * 4.0]])
+    expected = torch.tensor(
+        [[1e-3 * 100.0 * 2.0, 5e-2 * 0.04 * 10.0], [0.0, 5e-2 * 0.04 * 4.0]]
+    )
     assert torch.allclose(cost(trade, price), expected)
 
 

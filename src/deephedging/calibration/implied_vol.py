@@ -34,7 +34,9 @@ _EPS = torch.finfo(torch.float64).eps
 
 def _black_complement(x: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
     h, t = x / s, 0.5 * s
-    return torch.exp(0.5 * x) * normal_cdf(-h - t) + torch.exp(-0.5 * x) * normal_cdf(h - t)
+    return torch.exp(0.5 * x) * normal_cdf(-h - t) + torch.exp(-0.5 * x) * normal_cdf(
+        h - t
+    )
 
 
 def _vega(x: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
@@ -79,7 +81,9 @@ def _control(
     denominator = (slope_right - secant) if at_right else (secant - slope_left)
     control = numerator / denominator
     monotone = (slope_left + slope_right) / secant
-    return torch.clamp(torch.maximum(control, monotone), min=-1.0 + _EPS, max=1.0 / _EPS)
+    return torch.clamp(
+        torch.maximum(control, monotone), min=-1.0 + _EPS, max=1.0 / _EPS
+    )
 
 
 def _initial_guess(
@@ -119,7 +123,9 @@ def _initial_guess(
     f_u = normal_cdf(-0.5 * s_u)
     slope_u = -0.5 * torch.exp(0.5 * (x / s_u) ** 2)
     curvature_u = (
-        math.sqrt(0.5 * math.pi) * (x * x / s_u**3) * torch.exp((x / s_u) ** 2 + s_u**2 / 8.0)
+        math.sqrt(0.5 * math.pi)
+        * (x * x / s_u**3)
+        * torch.exp((x / s_u) ** 2 + s_u**2 / 8.0)
     )
     half = torch.full_like(x, -0.5)
     upper_value = _rational_cubic(
@@ -168,7 +174,9 @@ def _initial_guess(
     guess = torch.where(
         beta < b_l,
         lower,
-        torch.where(beta <= b_c, centre_left, torch.where(beta <= b_u, centre_right, upper)),
+        torch.where(
+            beta <= b_c, centre_left, torch.where(beta <= b_u, centre_right, upper)
+        ),
     )
     guess = torch.where(guess.isnan(), s_c, guess)
     return torch.maximum(guess, _EPS * s_c).clamp(max=1.0 / _EPS), b_l, b_u
@@ -214,7 +222,11 @@ def _householder_step(
     gamma = torch.where(upper_branch, g2 / p, gamma)
     delta = torch.where(upper_branch, g3 / p, delta)
 
-    step = newton * (1.0 + 0.5 * gamma * newton) / (1.0 + newton * (gamma + delta * newton / 6.0))
+    step = (
+        newton
+        * (1.0 + 0.5 * gamma * newton)
+        / (1.0 + newton * (gamma + delta * newton / 6.0))
+    )
     updated = s + step
     return torch.where(updated > 0.0, updated, 0.5 * s)
 

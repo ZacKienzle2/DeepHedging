@@ -42,7 +42,14 @@ def test_offset_kernels_match_host_argument_kernels_bitwise() -> None:
 
     gbm = CudaGBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=30)
     heston = CudaHestonSimulator(
-        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=0.25, n_steps=30
+        s0=100.0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.5,
+        rho=-0.7,
+        maturity=0.25,
+        n_steps=30,
     )
     for sim in (gbm, heston):
         scalar = sim.simulate(4096, noise=NoiseSpec(seed=7, stream=5))
@@ -118,14 +125,18 @@ def test_graph_generate_requires_graph_episode() -> None:
 
 def test_graph_generate_requires_a_seed() -> None:
     with pytest.raises(ValueError, match="seed"):
-        TrainConfig(n_iterations=1, batch_paths=8, graph_episode=True, graph_generate=True)
+        TrainConfig(
+            n_iterations=1, batch_paths=8, graph_episode=True, graph_generate=True
+        )
 
 
 @pytest.mark.gpu
 def test_graph_generate_rejects_simulators_without_offsets() -> None:
     if not torch.cuda.is_available():
         pytest.skip("no CUDA device")
-    sim = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=5, device="cuda")
+    sim = GBMSimulator(
+        s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=5, device="cuda"
+    )
     policy = FeedForwardPolicy(hidden_sizes=(4,)).to("cuda")
     config = TrainConfig(
         n_iterations=1, batch_paths=8, seed=1, graph_episode=True, graph_generate=True

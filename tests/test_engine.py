@@ -45,7 +45,9 @@ def _grid(n_paths: int, n_steps: int, seed: int) -> MarketState:
             ask_half_spread=st.floats(0.0, 0.01),
         ),
         st.builds(
-            PowerLawImpactCost, coefficient=st.floats(0.0, 0.01), exponent=st.floats(1.0, 2.0)
+            PowerLawImpactCost,
+            coefficient=st.floats(0.0, 0.01),
+            exponent=st.floats(1.0, 2.0),
         ),
     ),
     feature_map=st.none(),
@@ -94,15 +96,17 @@ def test_equivalent_hedge_pnl_settled_per_date_hedge_pnl(
     premium: float,
     state: deephedging.MarketState,
 ) -> None:
-    result_hedge_pnl_settled_per_date = deephedging.baselines.hedge_pnl_settled_per_date(
-        state=state,
-        policy=policy,
-        payoff=payoff,
-        cost_model=cost_model,
-        premium=premium,
-        liquidate_terminal=liquidate_terminal,
-        checkpoint_steps=checkpoint_steps,
-        feature_map=feature_map,
+    result_hedge_pnl_settled_per_date = (
+        deephedging.baselines.hedge_pnl_settled_per_date(
+            state=state,
+            policy=policy,
+            payoff=payoff,
+            cost_model=cost_model,
+            premium=premium,
+            liquidate_terminal=liquidate_terminal,
+            checkpoint_steps=checkpoint_steps,
+            feature_map=feature_map,
+        )
     )
     result_hedge_pnl = deephedging.hedge_pnl(
         state=state,

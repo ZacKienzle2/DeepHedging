@@ -33,7 +33,10 @@ def test_provenance_identifies_the_build() -> None:
     record = _record("prov")
     for key in ("commit", "torch", "cuda", "device", "platform", "created_utc"):
         assert record.provenance[key]
-    assert len(record.provenance["commit"]) in (7, 40) or record.provenance["commit"] == "unknown"
+    assert (
+        len(record.provenance["commit"]) in (7, 40)
+        or record.provenance["commit"] == "unknown"
+    )
 
 
 def test_missing_file_loads_empty(tmp_path: Path) -> None:

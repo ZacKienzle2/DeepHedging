@@ -32,7 +32,9 @@ def test_default_features_shape_and_values() -> None:
     tau = state.spot.new_tensor(0.5)
     features = DefaultFeatures()(state, 4, tau, position)
     assert features.shape == (state.n_paths, 3)
-    assert torch.allclose(features[:, 0], torch.log(state.spot[4] / state.spot[0]), atol=1e-6)
+    assert torch.allclose(
+        features[:, 0], torch.log(state.spot[4] / state.spot[0]), atol=1e-6
+    )
     assert torch.all(features[:, 1] == 0.5)
     assert torch.all(features[:, 2] == 0.3)
 
@@ -55,7 +57,14 @@ def test_running_max_features_monotone_and_adapted() -> None:
 
 def test_variance_features_read_heston_channel() -> None:
     sim = HestonSimulator(
-        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=1.0, n_steps=12
+        s0=100.0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.5,
+        rho=-0.7,
+        maturity=1.0,
+        n_steps=12,
     )
     state = sim.simulate(64, noise=NoiseSpec(seed=23))
     position = state.spot.new_zeros(state.n_paths)

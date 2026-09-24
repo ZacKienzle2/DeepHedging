@@ -59,12 +59,16 @@ class CorrelatedGBMSimulator:
         matrix = torch.tensor(self.correlation, dtype=torch.float64)
         n_assets = len(self.sigmas)
         if matrix.shape != (n_assets, n_assets):
-            msg = f"correlation must be {n_assets}x{n_assets}, got {tuple(matrix.shape)}"
+            msg = (
+                f"correlation must be {n_assets}x{n_assets}, got {tuple(matrix.shape)}"
+            )
             raise ValueError(msg)
         if not torch.allclose(matrix, matrix.T, atol=1e-12):
             msg = "correlation must be symmetric"
             raise ValueError(msg)
-        if not torch.allclose(matrix.diagonal(), torch.ones(n_assets, dtype=torch.float64)):
+        if not torch.allclose(
+            matrix.diagonal(), torch.ones(n_assets, dtype=torch.float64)
+        ):
             msg = "correlation must have a unit diagonal"
             raise ValueError(msg)
         try:

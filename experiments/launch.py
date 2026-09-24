@@ -65,9 +65,13 @@ def main() -> None:
         queues[index % device_count].append(study)
 
     with ThreadPoolExecutor(max_workers=device_count) as pool:
-        results = pool.map(run_queue, range(device_count), queues, [arguments.smoke] * device_count)
+        results = pool.map(
+            run_queue, range(device_count), queues, [arguments.smoke] * device_count
+        )
         failures = sum(code != 0 for codes in results for code in codes)
-    print(f"{len(STUDIES)} studies across {device_count} device(s), {failures} failure(s)")
+    print(
+        f"{len(STUDIES)} studies across {device_count} device(s), {failures} failure(s)"
+    )
     if failures:
         raise SystemExit(1)
 

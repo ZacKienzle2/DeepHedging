@@ -106,7 +106,9 @@ class SpectralRisk(RiskMeasure):
 
         return cls(distortion, name=f"cvar(alpha={alpha})")
 
-    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Evaluates the spectral risk of a loss sample.
 
         Args:

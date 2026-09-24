@@ -61,7 +61,9 @@ class MultiLevelRisk(RiskMeasure):
         ]
 
     @override
-    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Evaluates the mean of the per-level risks.
 
         Args:
@@ -72,11 +74,16 @@ class MultiLevelRisk(RiskMeasure):
         Returns:
             Scalar mean of the level risks.
         """
-        risks = [measure(column, weight) for measure, column, weight in self._levels(loss, weights)]
+        risks = [
+            measure(column, weight)
+            for measure, column, weight in self._levels(loss, weights)
+        ]
         return torch.stack(risks).mean()
 
     @override
-    def warm_start(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> None:
+    def warm_start(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> None:
         """Warm-starts each level's measure on its own paths.
 
         Args:

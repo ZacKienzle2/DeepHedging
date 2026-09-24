@@ -28,7 +28,9 @@ SLOPE_TARGET = 1.0 / 3.0
 SLOPE_BOUNDS = (0.27, 0.40)
 
 
-def band_width(inventory: list[float], response: list[float], threshold: float) -> float:
+def band_width(
+    inventory: list[float], response: list[float], threshold: float
+) -> float:
     """Measures the inventory interval the policy leaves in place.
 
     Args:
@@ -40,7 +42,9 @@ def band_width(inventory: list[float], response: list[float], threshold: float) 
         Width of the no-trade interval, zero when the policy always
         trades by more than the threshold.
     """
-    held = [p for p, a in zip(inventory, response, strict=True) if abs(a - p) < threshold]
+    held = [
+        p for p, a in zip(inventory, response, strict=True) if abs(a - p) < threshold
+    ]
     if not held:
         return 0.0
     return max(held) - min(held)
@@ -99,7 +103,9 @@ def main() -> None:
         return
 
     lower, upper = SLOPE_BOUNDS
-    print(f"target slope {SLOPE_TARGET:.3f}, consistent if within [{lower:.2f}, {upper:.2f}]")
+    print(
+        f"target slope {SLOPE_TARGET:.3f}, consistent if within [{lower:.2f}, {upper:.2f}]"
+    )
     for (alpha, threshold), points in sorted(probes.items()):
         try:
             slope, stderr, r_squared = fit_slope(points)

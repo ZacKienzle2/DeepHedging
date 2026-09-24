@@ -39,7 +39,9 @@ def brownian_bridge_matrix(n_steps: int) -> torch.Tensor:
         if right - left < 2:
             continue
         middle = (left + right) // 2
-        mean = ((right - middle) * levels[left] + (middle - left) * levels[right]) / (right - left)
+        mean = ((right - middle) * levels[left] + (middle - left) * levels[right]) / (
+            right - left
+        )
         spread = math.sqrt((middle - left) * (right - middle) / (right - left))
         levels[middle] = mean + spread * basis[column]
         column += 1
@@ -121,7 +123,9 @@ class GBMSimulator:
         if self.sampler == "sobol":
             log_returns = self._sobol_log_returns(n_paths, noise, dt)
         else:
-            generator = noise.torch_generator(self.device) if noise is not None else None
+            generator = (
+                noise.torch_generator(self.device) if noise is not None else None
+            )
             drift = (self.mu - 0.5 * self.sigma**2) * dt
             diffusion = self.sigma * dt**0.5
             z = torch.randn(
@@ -136,7 +140,9 @@ class GBMSimulator:
         out[1:] = log_returns
         return MarketState(spot=out.exp_().mul_(self.s0))
 
-    def _sobol_log_returns(self, n_paths: int, noise: NoiseSpec | None, dt: float) -> torch.Tensor:
+    def _sobol_log_returns(
+        self, n_paths: int, noise: NoiseSpec | None, dt: float
+    ) -> torch.Tensor:
         seed = (
             noise.torch_generator().initial_seed()
             if noise is not None
@@ -147,5 +153,8 @@ class GBMSimulator:
         normals = torch.special.ndtri(uniforms.add_(2.0 ** -(engine.MAXBIT + 1)))
         times = torch.arange(1, self.n_steps + 1, dtype=torch.float64) * dt
         levels = math.sqrt(dt) * (brownian_bridge_matrix(self.n_steps) @ normals.T)
-        log_returns = (self.mu - 0.5 * self.sigma**2) * times[:, None] + self.sigma * levels
-        return log_returns.to(dtype=self.dtype, device=self.device)
+        log_returns = (self.mu - 0.5 * self.sigma**2) * times[
+            :, None
+        ] + self.sigma * levels
+        increments: torch.Tensor = log_returns.to(dtype=self.dtype, device=self.device)
+        return increments

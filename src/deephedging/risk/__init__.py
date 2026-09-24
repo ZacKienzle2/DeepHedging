@@ -7,4 +7,11 @@ from deephedging.risk.mean_variance import MeanVariance
 from deephedging.risk.multi_level import MultiLevelRisk
 from deephedging.risk.spectral import SpectralRisk
 
-__all__ = ["CVaR", "Entropic", "MeanVariance", "MultiLevelRisk", "RiskMeasure", "SpectralRisk"]
+__all__ = [
+    "CVaR",
+    "Entropic",
+    "MeanVariance",
+    "MultiLevelRisk",
+    "RiskMeasure",
+    "SpectralRisk",
+]

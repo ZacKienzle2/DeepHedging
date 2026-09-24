@@ -59,7 +59,9 @@ def hedge_pnl_settled_per_date(
         return values.sum(dim=-1) if values.dim() == 2 else values
 
     features_of = feature_map if feature_map is not None else DefaultFeatures()
-    taus = torch.arange(n_steps, 0, -1, dtype=paths.dtype, device=paths.device) / n_steps
+    taus = (
+        torch.arange(n_steps, 0, -1, dtype=paths.dtype, device=paths.device) / n_steps
+    )
     position = paths.new_zeros(paths.shape[1:])
     pnl = paths.new_zeros(state.n_paths) + premium
     hidden: torch.Tensor | None = None
@@ -69,7 +71,9 @@ def hedge_pnl_settled_per_date(
         features = features_of(state, t, taus[t], position)
         if use_checkpoint:
             output = checkpoint(policy, features, hidden, use_reentrant=False)
-            new_position, hidden = cast("tuple[torch.Tensor, torch.Tensor | None]", output)
+            new_position, hidden = cast(
+                "tuple[torch.Tensor, torch.Tensor | None]", output
+            )
         else:
             new_position, hidden = policy(features, hidden)
         new_position = new_position.to(paths.dtype)
@@ -117,7 +121,10 @@ def merton_call_price_per_term(
             - math.lgamma(count + 1.0)
         )
         sigma_n = math.sqrt(sigma**2 + count * jump_vol**2 / tau)
-        rate_n = -jump_intensity * mean_jump_size + count * (jump_mean + 0.5 * jump_vol**2) / tau
+        rate_n = (
+            -jump_intensity * mean_jump_size
+            + count * (jump_mean + 0.5 * jump_vol**2) / tau
+        )
         discounted = bs_call_price(spot, strike, sigma_n, tau, rate=rate_n)
         total = total + math.exp(log_weight) * discounted * math.exp(rate_n * tau)
     return total
@@ -146,7 +153,9 @@ def bootstrap_metric_per_resample(
     generator = torch.Generator(device=pnl.device).manual_seed(seed)
     estimates = pnl.new_empty(n_resamples)
     for index in range(n_resamples):
-        draw = torch.randint(n_paths, (n_paths,), generator=generator, device=pnl.device)
+        draw = torch.randint(
+            n_paths, (n_paths,), generator=generator, device=pnl.device
+        )
         estimates[index] = metric(pnl[draw])
     tail = (1.0 - confidence) / 2.0
     return BootstrapInterval(
@@ -157,9 +166,13 @@ def bootstrap_metric_per_resample(
     )
 
 
-def _call_by_mpmath(spot: Any, strike: Any, sigma: Any, tau: Any, rate: Any, digits: int) -> Any:
+def _call_by_mpmath(
+    spot: Any, strike: Any, sigma: Any, tau: Any, rate: Any, digits: int
+) -> Any:
     with mpmath.workdps(digits):
-        s, k, v, t, r = (mpmath.mpf(value) for value in (spot, strike, sigma, tau, rate))
+        s, k, v, t, r = (
+            mpmath.mpf(value) for value in (spot, strike, sigma, tau, rate)
+        )
         d1 = (mpmath.log(s / k) + (r + v**2 / 2) * t) / (v * mpmath.sqrt(t))
         d2 = d1 - v * mpmath.sqrt(t)
         return s * mpmath.ncdf(d1) - k * mpmath.exp(-r * t) * mpmath.ncdf(d2)
@@ -261,6 +274,8 @@ def rough_bergomi_factor_per_maturity(
     cross = scale * (grid[:, None] ** (hurst + 0.5) - lag ** (hurst + 0.5))
     driver = torch.minimum(grid[:, None], grid)
     covariance = torch.cat(
-        (torch.cat((volterra, cross), dim=1), torch.cat((cross.T, driver), dim=1)), dim=0
+        (torch.cat((volterra, cross), dim=1), torch.cat((cross.T, driver), dim=1)),
+        dim=0,
     )
-    return torch.linalg.cholesky(covariance)
+    factor: torch.Tensor = torch.linalg.cholesky(covariance)
+    return factor

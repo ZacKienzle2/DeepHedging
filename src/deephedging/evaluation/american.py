@@ -52,7 +52,9 @@ def binomial_american_put(
     spots = s0 * up ** (2.0 * exponents - n_steps)
     values = torch.clamp(strike - spots, min=0.0)
     for step in range(n_steps - 1, -1, -1):
-        values = discount * (probability * values[1:] + (1.0 - probability) * values[:-1])
+        values = discount * (
+            probability * values[1:] + (1.0 - probability) * values[:-1]
+        )
         spots = s0 * up ** (2.0 * torch.arange(step + 1, dtype=torch.float64) - step)
         values = torch.maximum(values, torch.clamp(strike - spots, min=0.0))
     return float(values[0])
