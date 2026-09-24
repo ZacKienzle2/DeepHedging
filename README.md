@@ -1,5 +1,7 @@
 # DeepHedging
 
+<!-- SPHINX-START -->
+
 Deep hedging research framework. Neural hedging policies are trained by
 stochastic gradient descent on convex risk measures of terminal PnL over
 simulated market paths under realistic frictions, with custom CUDA path kernels,
@@ -13,15 +15,15 @@ hedge analytically. This framework drops both assumptions. Transaction costs,
 discrete rebalancing, stochastic volatility, jumps, and barrier liabilities
 enter the simulator, and the optimiser finds the policy the simulated market
 rewards. Paths are generated on the fly each batch from addressable noise
-streams, so data is unbounded, nothing overfits a stored dataset, and any single
-batch replays exactly.
+streams, so data is unbounded, nothing overfits a stored dataset, and each batch
+replays exactly.
 
 `Main.ipynb` is the executable walkthrough. The `experiments/` directory holds
-the full studies; every run appends a JSON line carrying the commit, library
-versions, device, seeds, and loss history, so each table below regenerates from
-its committed store.
+the full studies. Every run appends a JSON line with the commit, library
+versions, device, seeds, and loss history. Each table below regenerates from its
+committed store.
 
-## Headline results
+## Results
 
 All numbers are repo artifacts produced on an RTX 5080 from the committed
 experiment stores and the test suite.
@@ -59,9 +61,9 @@ dispatch-bound training iteration into one replay, and bfloat16 autocast under
 capture cuts that iteration by a further third; the noise-regenerative backward
 cuts peak training memory 12.7x at a quarter-million paths and lifts the
 feasible batch from a quarter million to beyond two million paths on a
-sixteen-gigabyte device.
-[docs/performance-review.md](docs/performance-review.md) records the profiles,
-the literature and the before and after measurements behind each optimisation.
+sixteen-gigabyte device. The [performance review](docs/performance-review.md)
+records the profiles, the literature and the before and after measurements
+behind each optimisation.
 
 ## Layout
 
@@ -98,7 +100,7 @@ Main.ipynb        End-to-end walkthrough
 ## Getting started
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). A CUDA device is
-used automatically when available; everything also runs on CPU. The fused
+used automatically when available, and everything also runs on CPU. The fused
 kernels compile on first use, which needs a CUDA toolchain and, on Windows, an
 MSVC host compiler.
 
@@ -107,7 +109,6 @@ git clone https://github.com/ZacKienzle2/DeepHedging.git
 cd DeepHedging
 uv sync                      # the package and the dev dependency group
 uv sync --extra notebook     # additionally, for Main.ipynb
-pre-commit install --install-hooks
 ```
 
 Reproduce a study:
@@ -123,11 +124,8 @@ uv run python experiments/band_scaling.py               # fit from the store
 The sessions in `noxfile.py` run the same tools CI runs.
 
 ```bash
-nox                                  # lint, tests, typing
-nox -s bench                         # pytest-benchmark throughput suite
-nox -s fast                          # tests a change affects, by testmon
-nox -s mutants -- <module>           # cosmic-ray mutation testing
-nox -s generate -- <old> <new>       # ghostwritten equivalence test
+nox                                  # lint and tests
+uv run pytest --benchmark-only       # pytest-benchmark throughput suite
 uv run pytest -m gpu                 # kernel and capture parity
 ```
 
@@ -138,16 +136,12 @@ paths measured loss-identical to stored ones.
 
 ## Design notes
 
-Key decisions and the failure modes they prevent are documented in the module
-docstrings, among them log-space path evolution, the learned CVaR threshold with
-quantile warm start, addressable noise streams mapped onto Philox subsequences,
-the whole-episode capture unit, the seed requirement on the regenerative
-backward, and the semilinear scope fence on the BSDE solver. `Main.ipynb` closes
-with a summary.
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy.
+Each module docstring explains the decisions made there and the failure modes
+they prevent. Examples include log-space path evolution, the learned CVaR
+threshold with quantile warm start, addressable noise streams mapped onto Philox
+subsequences, the whole-episode capture unit, the seed requirement on the
+regenerative backward, and the semilinear scope fence on the BSDE solver.
+`Main.ipynb` closes with a summary.
 
 ## License
 

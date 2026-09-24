@@ -40,7 +40,9 @@ class CVaR(RiskMeasure):
         self.alpha = alpha
         self.threshold = nn.Parameter(torch.zeros(()))
 
-    def warm_start(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> None:
+    def warm_start(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> None:
         """Initialises the threshold at the empirical alpha-quantile.
 
         Without this, a threshold starting at zero lags the true VaR for
@@ -59,7 +61,9 @@ class CVaR(RiskMeasure):
             else:
                 self.threshold.copy_(weighted_quantile(loss, weights, self.alpha))
 
-    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Evaluates the Rockafellar-Uryasev objective.
 
         Args:

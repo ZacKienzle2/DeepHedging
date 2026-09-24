@@ -86,7 +86,9 @@ class HestonVarianceSwapSimulator:
         """
         return self._extend(self.heston.simulate(n_paths, noise=noise))
 
-    def simulate_with_offset(self, n_paths: int, seed: int, offset: torch.Tensor) -> MarketState:
+    def simulate_with_offset(
+        self, n_paths: int, seed: int, offset: torch.Tensor
+    ) -> MarketState:
         """Simulates the two-asset market addressed by a device offset.
 
         Delegates generation to the wrapped sampler's offset entry
@@ -127,7 +129,9 @@ class HestonVarianceSwapSimulator:
             self.heston.n_steps + 1, dtype=variance.dtype, device=variance.device
         ).unsqueeze(1)
         decay = -torch.expm1(-kappa * remaining) / kappa
-        swap = (accrued + (variance - theta) * decay + theta * remaining) / self.vs_maturity
+        swap = (
+            accrued + (variance - theta) * decay + theta * remaining
+        ) / self.vs_maturity
         return MarketState(
             spot=torch.stack((state.spot, swap), dim=-1),
             aux={"variance": variance},
@@ -142,4 +146,6 @@ class HestonVarianceSwapSimulator:
         kappa = self.heston.kappa
         theta = self.heston.theta
         decay = -math.expm1(-kappa * self.vs_maturity) / kappa
-        return ((self.heston.v0 - theta) * decay + theta * self.vs_maturity) / self.vs_maturity
+        return (
+            (self.heston.v0 - theta) * decay + theta * self.vs_maturity
+        ) / self.vs_maturity

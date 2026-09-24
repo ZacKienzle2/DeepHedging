@@ -47,11 +47,13 @@ def normal_cdf(z: torch.Tensor) -> torch.Tensor:
     Returns:
         ``Phi(z)`` with the shape of ``z``.
     """
-    return 0.5 * torch.special.erfc(-z / _SQRT_2)
+    cdf: torch.Tensor = 0.5 * torch.special.erfc(-z / _SQRT_2)
+    return cdf
 
 
 def _mills(z: torch.Tensor) -> torch.Tensor:
-    return 0.5 * _SQRT_2PI * torch.special.erfcx(-z / _SQRT_2)
+    ratio: torch.Tensor = 0.5 * _SQRT_2PI * torch.special.erfcx(-z / _SQRT_2)
+    return ratio
 
 
 def _asymptotic_difference(h: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
@@ -125,9 +127,9 @@ def normalised_black(
     if bool(direct.any()):
         hd, td = h[direct], t[direct]
         exact = torch.ones_like(h)
-        exact[direct] = normal_cdf(hd + td) * torch.exp(hd * td) - normal_cdf(hd - td) * torch.exp(
-            -hd * td
-        )
+        exact[direct] = normal_cdf(hd + td) * torch.exp(hd * td) - normal_cdf(
+            hd - td
+        ) * torch.exp(-hd * td)
         log_price = torch.where(direct, torch.log(exact), log_price)
         ratio = torch.where(direct, torch.exp(log_vega - log_price), ratio)
     return torch.exp(log_price), log_price, ratio
@@ -147,9 +149,15 @@ def _black_price(
     x = torch.log(spot_t / strike) + rate * tau_t
     moneyness, s = torch.broadcast_tensors(sign * x, sigma * torch.sqrt(tau_t))
     in_the_money = moneyness > 0.0
-    time_value, _, _ = normalised_black(torch.where(in_the_money, -moneyness, moneyness), s)
+    time_value, _, _ = normalised_black(
+        torch.where(in_the_money, -moneyness, moneyness), s
+    )
     intrinsic = torch.where(in_the_money, 2.0 * torch.sinh(0.5 * moneyness), 0.0)
-    return torch.sqrt(spot_t * strike) * torch.exp(-0.5 * rate * tau_t) * (time_value + intrinsic)
+    return (
+        torch.sqrt(spot_t * strike)
+        * torch.exp(-0.5 * rate * tau_t)
+        * (time_value + intrinsic)
+    )
 
 
 def _d1(
@@ -161,7 +169,9 @@ def _d1(
     if bool(torch.any(tau <= 0.0)):
         msg = "tau must be positive everywhere"
         raise ValueError(msg)
-    return (torch.log(spot / strike) + (rate + 0.5 * sigma**2) * tau) / (sigma * torch.sqrt(tau))
+    return (torch.log(spot / strike) + (rate + 0.5 * sigma**2) * tau) / (
+        sigma * torch.sqrt(tau)
+    )
 
 
 def bs_call_price(
@@ -234,7 +244,8 @@ def bs_call_delta(
     """
     spot_t = torch.as_tensor(spot, dtype=torch.float64)
     tau_t = torch.as_tensor(tau, dtype=torch.float64)
-    return torch.special.ndtr(_d1(spot_t, strike, sigma, tau_t, rate))
+    delta: torch.Tensor = torch.special.ndtr(_d1(spot_t, strike, sigma, tau_t, rate))
+    return delta
 
 
 def bs_call_vega(

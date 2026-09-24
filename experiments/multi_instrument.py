@@ -121,7 +121,9 @@ def main() -> None:
     two_asset = HestonVarianceSwapSimulator(heston=heston, vs_maturity=SWAP_MATURITY)
     call = EuropeanCall(strike=STRIKE)
     wrapped_call = SingleAssetPayoff(inner=call)
-    estimate = MonteCarloPricer(n_paths=premium_paths, seed=PREMIUM_SEED).price(call, heston)
+    estimate = MonteCarloPricer(n_paths=premium_paths, seed=PREMIUM_SEED).price(
+        call, heston
+    )
     premium = estimate.value
     print(f"call premium {premium:.4f} (se {estimate.standard_error:.4f})")
 
@@ -170,7 +172,9 @@ def main() -> None:
                     simulator, payoff, feature_map = heston, call, None
                     eval_state = eval_single
                 else:
-                    policy = FeedForwardPolicy(n_features=5, hidden_sizes=(64, 64), n_outputs=2)
+                    policy = FeedForwardPolicy(
+                        n_features=5, hidden_sizes=(64, 64), n_outputs=2
+                    )
                     simulator, payoff = two_asset, wrapped_call
                     feature_map = MultiAssetFeatures(n_assets=2)
                     eval_state = eval_double

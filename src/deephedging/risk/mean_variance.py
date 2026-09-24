@@ -43,7 +43,9 @@ class MeanVariance(RiskMeasure):
         self.risk_aversion = risk_aversion
         self.downside = downside
 
-    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Evaluates the mean-variance objective.
 
         Args:

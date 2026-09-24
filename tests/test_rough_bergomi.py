@@ -47,7 +47,9 @@ def test_fuzz_rough_bergomi_simulator_simulate(
 
 
 @given(hurst=_HURST, rho=_RHO, maturity=_MATURITY, n_steps=_STEPS)
-def test_fuzz_rough_bergomi_factor(hurst: float, rho: float, maturity: float, n_steps: int) -> None:
+def test_fuzz_rough_bergomi_factor(
+    hurst: float, rho: float, maturity: float, n_steps: int
+) -> None:
     deephedging.market.rough_bergomi.rough_bergomi_factor(
         hurst=hurst, rho=rho, maturity=maturity, n_steps=n_steps
     )

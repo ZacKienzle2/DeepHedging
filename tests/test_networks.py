@@ -12,7 +12,9 @@ import deephedging.networks
     hidden_sizes=st.lists(st.integers(1, 64), max_size=4).map(tuple),
     out_features=st.integers(1, 64),
 )
-def test_fuzz_mlp(in_features: int, hidden_sizes: tuple[int, ...], out_features: int) -> None:
+def test_fuzz_mlp(
+    in_features: int, hidden_sizes: tuple[int, ...], out_features: int
+) -> None:
     deephedging.networks.mlp(
         in_features=in_features, hidden_sizes=hidden_sizes, out_features=out_features
     )

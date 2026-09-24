@@ -28,7 +28,9 @@ def parse_study_arguments(fused_option: bool = False) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true")
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument(
+        "--device", default="cuda" if torch.cuda.is_available() else "cpu"
+    )
     if fused_option:
         parser.add_argument("--fused", action="store_true")
     arguments = parser.parse_args()

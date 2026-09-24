@@ -71,19 +71,27 @@ def _synchronised(device: str, fn: Callable[[], object]) -> Callable[[], None]:
 
 @pytest.mark.parametrize("device", _DEVICES)
 def test_gbm_generation(benchmark: BenchmarkFixture, device: str) -> None:
-    simulator = GBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=_STEPS, device=device)
-    benchmark(_synchronised(device, lambda: simulator.simulate(_PATHS[device], noise=_NOISE)))
+    simulator = GBMSimulator(
+        s0=100.0, sigma=0.2, maturity=0.25, n_steps=_STEPS, device=device
+    )
+    benchmark(
+        _synchronised(device, lambda: simulator.simulate(_PATHS[device], noise=_NOISE))
+    )
 
 
 @pytest.mark.parametrize("device", _DEVICES)
 def test_heston_generation(benchmark: BenchmarkFixture, device: str) -> None:
     simulator = HestonSimulator(**_HESTON, maturity=0.25, n_steps=_STEPS, device=device)
-    benchmark(_synchronised(device, lambda: simulator.simulate(_PATHS[device], noise=_NOISE)))
+    benchmark(
+        _synchronised(device, lambda: simulator.simulate(_PATHS[device], noise=_NOISE))
+    )
 
 
 @pytest.mark.parametrize("device", _DEVICES)
 def test_eager_train_step(benchmark: BenchmarkFixture, device: str) -> None:
-    simulator = GBMSimulator(s0=100.0, sigma=0.2, maturity=0.25, n_steps=_STEPS, device=device)
+    simulator = GBMSimulator(
+        s0=100.0, sigma=0.2, maturity=0.25, n_steps=_STEPS, device=device
+    )
     policy = FeedForwardPolicy(hidden_sizes=(64, 64)).to(device)
     risk = CVaR(alpha=0.95).to(device)
     optimizer = torch.optim.Adam([*policy.parameters(), *risk.parameters()], lr=1e-3)
@@ -109,7 +117,9 @@ def test_fused_generation(benchmark: BenchmarkFixture, model: str) -> None:
         if model == "gbm"
         else CudaHestonSimulator(**_HESTON, maturity=0.25, n_steps=_STEPS)
     )
-    benchmark(_synchronised("cuda", lambda: simulator.simulate(_PATHS["cuda"], noise=_NOISE)))
+    benchmark(
+        _synchronised("cuda", lambda: simulator.simulate(_PATHS["cuda"], noise=_NOISE))
+    )
 
 
 @pytest.mark.gpu

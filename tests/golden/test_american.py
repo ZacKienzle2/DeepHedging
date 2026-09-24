@@ -28,7 +28,9 @@ def test_zero_rate_collapses_to_european() -> None:
 
 @pytest.mark.slow
 def test_lsm_matches_binomial_tree() -> None:
-    simulator = GBMSimulator(s0=_S0, sigma=_SIGMA, maturity=_MATURITY, n_steps=50, mu=_RATE)
+    simulator = GBMSimulator(
+        s0=_S0, sigma=_SIGMA, maturity=_MATURITY, n_steps=50, mu=_RATE
+    )
     estimate = lsm_american_put(simulator, _STRIKE, _RATE, n_paths=400_000, seed=229)
     reference = binomial_american_put(_S0, _STRIKE, _SIGMA, _MATURITY, _RATE)
     assert estimate.provenance == "lsm"
@@ -38,6 +40,10 @@ def test_lsm_matches_binomial_tree() -> None:
 
 
 def test_lsm_rejects_drift_mismatch() -> None:
-    simulator = GBMSimulator(s0=_S0, sigma=_SIGMA, maturity=_MATURITY, n_steps=10, mu=0.0)
-    with pytest.raises(ValueError, match=r"risk-neutral pricing needs simulator drift 0\.05"):
+    simulator = GBMSimulator(
+        s0=_S0, sigma=_SIGMA, maturity=_MATURITY, n_steps=10, mu=0.0
+    )
+    with pytest.raises(
+        ValueError, match=r"risk-neutral pricing needs simulator drift 0\.05"
+    ):
         lsm_american_put(simulator, _STRIKE, rate=_RATE, n_paths=64)

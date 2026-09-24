@@ -140,9 +140,19 @@ def test_solver_dim_mismatch_rejected() -> None:
 def test_invalid_problem_parameters_raise() -> None:
     with pytest.raises(ValueError, match="dim must be at least 1"):
         BSDEProblem(
-            dim=0, x0=100.0, sigma=0.2, maturity=1.0, n_steps=5, terminal=_call_terminal(100.0)
+            dim=0,
+            x0=100.0,
+            sigma=0.2,
+            maturity=1.0,
+            n_steps=5,
+            terminal=_call_terminal(100.0),
         )
     with pytest.raises(ValueError, match="x0 must be positive"):
         BSDEProblem(
-            dim=1, x0=-1.0, sigma=0.2, maturity=1.0, n_steps=5, terminal=_call_terminal(100.0)
+            dim=1,
+            x0=-1.0,
+            sigma=0.2,
+            maturity=1.0,
+            n_steps=5,
+            terminal=_call_terminal(100.0),
         )

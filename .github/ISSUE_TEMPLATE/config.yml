@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Security Vulnerability
-    url: https://github.com/ZacKienzle2/DeepHedging/security/advisories/new
-    about: Do not file security issues publicly. See SECURITY.md and use private vulnerability reporting.
-  - name: Question or Discussion
-    url: https://github.com/ZacKienzle2/DeepHedging/discussions
-    about: For questions and open-ended discussions, use Discussions instead of Issues.

@@ -87,7 +87,9 @@ class DeepSetPolicy(HedgePolicy):
         log_moneyness = features[:, : self.n_assets]
         tau = features[:, self.n_assets : self.n_assets + 1]
         position = features[:, self.n_assets + 1 :]
-        tokens = torch.stack((log_moneyness, position, tau.expand(-1, self.n_assets)), dim=-1)
+        tokens = torch.stack(
+            (log_moneyness, position, tau.expand(-1, self.n_assets)), dim=-1
+        )
         latent = self.encoder(tokens)
         pooled = latent.mean(dim=1, keepdim=True).expand(-1, self.n_assets, -1)
         combined = torch.cat((latent, pooled), dim=-1)

@@ -44,16 +44,23 @@ def _positions(
     paths = state.spot
     n_steps = state.n_steps
     features_of = feature_map if feature_map is not None else DefaultFeatures()
-    taus = torch.arange(n_steps, 0, -1, dtype=paths.dtype, device=paths.device) / n_steps
+    taus = (
+        torch.arange(n_steps, 0, -1, dtype=paths.dtype, device=paths.device) / n_steps
+    )
     position = paths.new_zeros(paths.shape[1:])
     hidden: torch.Tensor | None = None
     use_checkpoint = checkpoint_steps and torch.is_grad_enabled()
     device_type = paths.device.type
     held: list[torch.Tensor] = []
     if isinstance(policy, NoTransactionBandPolicy) and not use_checkpoint:
-        grid = torch.stack([features_of(state, t, taus[t], position) for t in range(n_steps)])
+        grid = torch.stack(
+            [features_of(state, t, taus[t], position) for t in range(n_steps)]
+        )
         with torch.autocast(
-            device_type=device_type, dtype=torch.bfloat16, enabled=amp, cache_enabled=False
+            device_type=device_type,
+            dtype=torch.bfloat16,
+            enabled=amp,
+            cache_enabled=False,
         ):
             lower, upper = policy.bands(grid)
         lower, upper = lower.to(paths.dtype), upper.to(paths.dtype)
@@ -64,11 +71,16 @@ def _positions(
     for t in range(n_steps):
         features = features_of(state, t, taus[t], position)
         with torch.autocast(
-            device_type=device_type, dtype=torch.bfloat16, enabled=amp, cache_enabled=False
+            device_type=device_type,
+            dtype=torch.bfloat16,
+            enabled=amp,
+            cache_enabled=False,
         ):
             if use_checkpoint:
                 output = checkpoint(policy, features, hidden, use_reentrant=False)
-                new_position, hidden = cast("tuple[torch.Tensor, torch.Tensor | None]", output)
+                new_position, hidden = cast(
+                    "tuple[torch.Tensor, torch.Tensor | None]", output
+                )
             else:
                 new_position, hidden = policy(features, hidden)
         position = new_position.to(paths.dtype)
@@ -127,7 +139,9 @@ def hedge_pnl(
         PnL per path of shape ``(n_paths,)``; positive is profit.
     """
     positions = _positions(state, policy, checkpoint_steps, feature_map, amp)
-    return pnl_from_positions(state, positions, payoff, cost_model, premium, liquidate_terminal)
+    return pnl_from_positions(
+        state, positions, payoff, cost_model, premium, liquidate_terminal
+    )
 
 
 def pnl_from_positions(

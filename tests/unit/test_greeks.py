@@ -14,9 +14,14 @@ def _call(
     tau: torch.Tensor,
     rate: torch.Tensor,
 ) -> torch.Tensor:
-    d1 = (torch.log(spot / strike) + (rate + 0.5 * sigma**2) * tau) / (sigma * torch.sqrt(tau))
+    d1 = (torch.log(spot / strike) + (rate + 0.5 * sigma**2) * tau) / (
+        sigma * torch.sqrt(tau)
+    )
     d2 = d1 - sigma * torch.sqrt(tau)
-    return spot * torch.special.ndtr(d1) - strike * torch.exp(-rate * tau) * torch.special.ndtr(d2)
+    price: torch.Tensor = spot * torch.special.ndtr(d1) - strike * torch.exp(
+        -rate * tau
+    ) * torch.special.ndtr(d2)
+    return price
 
 
 def _put(
@@ -26,7 +31,9 @@ def _put(
     tau: torch.Tensor,
     rate: torch.Tensor,
 ) -> torch.Tensor:
-    return _call(strike, spot, sigma, tau, rate) - spot + strike * torch.exp(-rate * tau)
+    return (
+        _call(strike, spot, sigma, tau, rate) - spot + strike * torch.exp(-rate * tau)
+    )
 
 
 def test_autodiff_delta_and_vega_match_closed_form() -> None:
@@ -34,8 +41,12 @@ def test_autodiff_delta_and_vega_match_closed_form() -> None:
     spot = torch.linspace(80.0, 120.0, 9, dtype=torch.float64)
     sigma, tau, rate = 0.2, 0.5, 0.01
     greeks = european_greeks(partial(_call, strike), spot, sigma, tau, rate)
-    assert torch.allclose(greeks.delta, bs_call_delta(spot, strike, sigma, tau, rate), atol=1e-8)
-    assert torch.allclose(greeks.vega, bs_call_vega(spot, strike, sigma, tau, rate), atol=1e-6)
+    assert torch.allclose(
+        greeks.delta, bs_call_delta(spot, strike, sigma, tau, rate), atol=1e-8
+    )
+    assert torch.allclose(
+        greeks.vega, bs_call_vega(spot, strike, sigma, tau, rate), atol=1e-6
+    )
 
 
 def test_gamma_is_positive_and_matches_finite_difference() -> None:
@@ -70,4 +81,7 @@ def test_scalar_inputs_return_scalar_greeks() -> None:
     strike = 100.0
     greeks = european_greeks(partial(_call, strike), 100.0, 0.2, 0.5, 0.0)
     assert greeks.delta.shape == torch.Size([])
-    assert abs(float(greeks.delta) - float(bs_call_delta(100.0, strike, 0.2, 0.5, 0.0))) < 1e-8
+    assert (
+        abs(float(greeks.delta) - float(bs_call_delta(100.0, strike, 0.2, 0.5, 0.0)))
+        < 1e-8
+    )

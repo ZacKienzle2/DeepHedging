@@ -43,7 +43,14 @@ def _cuda_gbm() -> CudaGBMSimulator:
 
 def _cuda_heston() -> CudaHestonSimulator:
     return CudaHestonSimulator(
-        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=1.0, n_steps=100
+        s0=100.0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.5,
+        rho=-0.7,
+        maturity=1.0,
+        n_steps=100,
     )
 
 
@@ -105,7 +112,14 @@ def test_heston_shape_channels_and_replay() -> None:
 
 def test_heston_zero_xi_degenerates_to_gbm_marginals() -> None:
     sim = CudaHestonSimulator(
-        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.0, rho=0.0, maturity=1.0, n_steps=100
+        s0=100.0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.0,
+        rho=0.0,
+        maturity=1.0,
+        n_steps=100,
     )
     state = sim.simulate(400_000, noise=NoiseSpec(seed=19))
     log_returns = torch.log(state.terminal / 100.0)
@@ -219,7 +233,10 @@ def test_pricer_fold_route_matches_grid_route() -> None:
 
     sim = _cuda_gbm()
     pricer = MonteCarloPricer(n_paths=100_000, seed=173)
-    for payoff in (EuropeanCall(strike=100.0), UpAndOutCall(strike=100.0, barrier=125.0)):
+    for payoff in (
+        EuropeanCall(strike=100.0),
+        UpAndOutCall(strike=100.0, barrier=125.0),
+    ):
         fast = pricer.price(payoff, sim)
         grid_state = sim.simulate(100_000, noise=NoiseSpec(seed=173))
         grid_values = payoff(grid_state.spot)
@@ -249,7 +266,9 @@ def test_graphed_episode_matches_eager_training() -> None:
             seed=5,
             graph_episode=graphed,
         )
-        return train(sim, policy, payoff, cost, CVaR(alpha=0.9), config, premium=4.0).losses
+        return train(
+            sim, policy, payoff, cost, CVaR(alpha=0.9), config, premium=4.0
+        ).losses
 
     first_eager = run(graphed=False, n_iterations=1)[0]
     first_graphed = run(graphed=True, n_iterations=1)[0]
@@ -266,13 +285,22 @@ def test_graphed_episode_matches_eager_training() -> None:
             graph_episode=True,
             checkpoint_steps=True,
         )
-        return train(sim, policy, payoff, cost, CVaR(alpha=0.9), config, premium=4.0).losses[0]
+        return train(
+            sim, policy, payoff, cost, CVaR(alpha=0.9), config, premium=4.0
+        ).losses[0]
 
     first_checkpointed = run_checkpointed()
     assert abs(first_graphed - first_checkpointed) < 1e-5 * max(1.0, abs(first_graphed))
 
     heston = CudaHestonSimulator(
-        s0=100.0, v0=0.04, kappa=1.5, theta=0.04, xi=0.5, rho=-0.7, maturity=0.25, n_steps=10
+        s0=100.0,
+        v0=0.04,
+        kappa=1.5,
+        theta=0.04,
+        xi=0.5,
+        rho=-0.7,
+        maturity=0.25,
+        n_steps=10,
     )
 
     def run_heston(graphed: bool) -> float:
@@ -314,9 +342,17 @@ def test_graphed_autocast_matches_eager_autocast() -> None:
             n_iterations=20, batch_paths=4096, seed=8, amp=True, graph_episode=graphed
         )
         return train(
-            sim, policy, EuropeanCall(strike=100.0), ProportionalCost(rate=1e-3), CVaR(0.9), config
+            sim,
+            policy,
+            EuropeanCall(strike=100.0),
+            ProportionalCost(rate=1e-3),
+            CVaR(0.9),
+            config,
         ).losses
 
     eager, graphed = run(graphed=False), run(graphed=True)
     assert abs(eager[0] - graphed[0]) < 1e-5 * max(1.0, abs(eager[0]))
-    assert all(abs(a - b) < 5e-2 * max(1.0, abs(a)) for a, b in zip(eager, graphed, strict=True))
+    assert all(
+        abs(a - b) < 5e-2 * max(1.0, abs(a))
+        for a, b in zip(eager, graphed, strict=True)
+    )

@@ -79,12 +79,23 @@ def main() -> None:
     objectives = (
         ("cvar0.95",)
         if arguments.smoke
-        else ("cvar0.9", "cvar0.95", "cvar0.99", "entropic1.0", "entropic5.0", "entropic10.0")
+        else (
+            "cvar0.9",
+            "cvar0.95",
+            "cvar0.99",
+            "entropic1.0",
+            "entropic5.0",
+            "entropic10.0",
+        )
     )
 
     results_path, completed = open_store(RESULTS, arguments.smoke)
     simulator = GBMSimulator(
-        s0=100.0, sigma=SIGMA, maturity=MATURITY, n_steps=N_STEPS, device=arguments.device
+        s0=100.0,
+        sigma=SIGMA,
+        maturity=MATURITY,
+        n_steps=N_STEPS,
+        device=arguments.device,
     )
     payoff = EuropeanCall(strike=STRIKE)
     cost = ProportionalCost(rate=COST_RATE)
@@ -98,7 +109,9 @@ def main() -> None:
                 print(f"skip {run_name} (already recorded)")
                 continue
             torch.manual_seed(seed)
-            policy = FeedForwardPolicy(n_features=3, hidden_sizes=(64, 64)).to(arguments.device)
+            policy = FeedForwardPolicy(n_features=3, hidden_sizes=(64, 64)).to(
+                arguments.device
+            )
             config = TrainConfig(
                 n_iterations=iterations,
                 batch_paths=batch_paths,

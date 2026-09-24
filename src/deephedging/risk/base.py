@@ -17,7 +17,9 @@ class RiskMeasure(nn.Module, ABC):
     """
 
     @abstractmethod
-    def forward(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Evaluates the risk of a loss sample.
 
         Args:
@@ -30,7 +32,9 @@ class RiskMeasure(nn.Module, ABC):
             Scalar risk value.
         """
 
-    def warm_start(self, loss: torch.Tensor, weights: torch.Tensor | None = None) -> None:
+    def warm_start(
+        self, loss: torch.Tensor, weights: torch.Tensor | None = None
+    ) -> None:
         """Initialises auxiliary parameters from an initial loss sample.
 
         Default is a no-op; risk measures with auxiliary state (the CVaR

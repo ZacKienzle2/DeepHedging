@@ -96,11 +96,15 @@ class HestonSimulator:
             device=self.device,
             generator=generator,
         )
-        z_var = (self.rho * z[0] + math.sqrt(1.0 - self.rho**2) * z[1]).mul_(self.xi * sqrt_dt)
+        z_var = (self.rho * z[0] + math.sqrt(1.0 - self.rho**2) * z[1]).mul_(
+            self.xi * sqrt_dt
+        )
         z_spot = z[0].mul_(sqrt_dt)
         log_return = torch.zeros((n_paths,), dtype=self.dtype, device=self.device)
         variance = torch.full((n_paths,), self.v0, dtype=self.dtype, device=self.device)
-        out = torch.empty((self.n_steps + 1, n_paths), dtype=self.dtype, device=self.device)
+        out = torch.empty(
+            (self.n_steps + 1, n_paths), dtype=self.dtype, device=self.device
+        )
         var_out = torch.empty_like(out)
         out[0] = 0.0
         var_out[0] = variance
@@ -109,12 +113,19 @@ class HestonSimulator:
             variance_plus = torch.clamp(variance, min=0.0)
             vol = torch.sqrt(variance_plus)
             log_return = log_return - 0.5 * dt * variance_plus + vol * z_spot[k]
-            variance = variance + mean_reversion - self.kappa * dt * variance_plus + vol * z_var[k]
+            variance = (
+                variance
+                + mean_reversion
+                - self.kappa * dt * variance_plus
+                + vol * z_var[k]
+            )
             out[k + 1] = log_return
             var_out[k + 1] = torch.clamp(variance, min=0.0)
         if self.mu != 0.0:
             drift = (
-                self.mu * dt * torch.arange(self.n_steps + 1, dtype=self.dtype, device=self.device)
+                self.mu
+                * dt
+                * torch.arange(self.n_steps + 1, dtype=self.dtype, device=self.device)
             )
             out += drift.unsqueeze(1)
         return MarketState(spot=out.exp_().mul_(self.s0), aux={"variance": var_out})

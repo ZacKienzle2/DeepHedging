@@ -142,7 +142,11 @@ def main() -> None:
     results_path, completed = open_store(RESULTS, arguments.smoke)
     premium = float(bs_call_price(100.0, STRIKE, SIGMA, MATURITY))
     simulator = GBMSimulator(
-        s0=100.0, sigma=SIGMA, maturity=MATURITY, n_steps=N_STEPS, device=arguments.device
+        s0=100.0,
+        sigma=SIGMA,
+        maturity=MATURITY,
+        n_steps=N_STEPS,
+        device=arguments.device,
     )
     payoff = EuropeanCall(strike=STRIKE)
     eval_state = simulator.simulate(eval_paths, noise=NoiseSpec(seed=EVAL_SEED))
@@ -204,7 +208,11 @@ def main() -> None:
                 duration = time.perf_counter() - started
                 with torch.no_grad():
                     pnl = hedge_pnl(
-                        eval_state, policy, payoff, cost_model(cost_rate), premium=premium
+                        eval_state,
+                        policy,
+                        payoff,
+                        cost_model(cost_rate),
+                        premium=premium,
                     )
                 summary = pnl_summary(pnl)
                 band = learned_band(policy, tau=0.5)

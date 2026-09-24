@@ -17,7 +17,9 @@ _SIGMA = 0.2
 _MATURITY = 30 / 365
 
 
-def _features(log_moneyness: float, tau: float, held: float, n: int = 8) -> torch.Tensor:
+def _features(
+    log_moneyness: float, tau: float, held: float, n: int = 8
+) -> torch.Tensor:
     column = torch.tensor([log_moneyness, tau, held])
     return column.expand(n, 3).clone()
 
@@ -27,7 +29,9 @@ def test_position_stays_inside_band_around_delta() -> None:
     policy = NoTransactionBandPolicy(sigma=_SIGMA, maturity=_MATURITY)
     features = _features(0.05, 0.5, 0.0)
     position, state = policy(features)
-    delta = float(bs_call_delta(100.0 * torch.tensor(0.05).exp(), 100.0, _SIGMA, 0.5 * _MATURITY))
+    delta = float(
+        bs_call_delta(100.0 * torch.tensor(0.05).exp(), 100.0, _SIGMA, 0.5 * _MATURITY)
+    )
     assert state is None
     assert position.shape == (8,)
     assert torch.all(position <= delta + 2.0)
@@ -74,12 +78,20 @@ def test_band_anchor_matches_closed_form_delta() -> None:
             with torch.no_grad():
                 upper, _ = policy(high_features)
                 lower, _ = policy(low_features)
-                high_widths = torch.nn.functional.softplus(policy.net(high_features[..., :2]))
-                low_widths = torch.nn.functional.softplus(policy.net(low_features[..., :2]))
+                high_widths = torch.nn.functional.softplus(
+                    policy.net(high_features[..., :2])
+                )
+                low_widths = torch.nn.functional.softplus(
+                    policy.net(low_features[..., :2])
+                )
             spot = 100.0 * torch.tensor(log_moneyness).exp()
             delta = float(bs_call_delta(spot, 100.0, _SIGMA, tau * _MATURITY))
-            assert float(upper) == pytest.approx(delta + float(high_widths[0, 1]), abs=1e-5)
-            assert float(lower) == pytest.approx(delta - float(low_widths[0, 0]), abs=1e-5)
+            assert float(upper) == pytest.approx(
+                delta + float(high_widths[0, 1]), abs=1e-5
+            )
+            assert float(lower) == pytest.approx(
+                delta - float(low_widths[0, 0]), abs=1e-5
+            )
 
 
 def test_no_gradient_when_held_inside_band() -> None:
@@ -87,8 +99,13 @@ def test_no_gradient_when_held_inside_band() -> None:
     policy = NoTransactionBandPolicy(sigma=_SIGMA, maturity=_MATURITY)
     delta = float(bs_call_delta(100.0, 100.0, _SIGMA, 0.5 * _MATURITY))
     position, _ = policy(_features(0.0, 0.5, delta))
-    grads = torch.autograd.grad(position.sum(), list(policy.parameters()), allow_unused=True)
-    assert all(g is None or float(g.abs().sum()) == 0.0 for g in grads)
+    grads = torch.autograd.grad(
+        position.sum(),
+        list(policy.parameters()),
+        allow_unused=True,
+        materialize_grads=True,
+    )
+    assert all(float(g.abs().sum()) == 0.0 for g in grads)
 
 
 def test_invalid_parameters_raise() -> None:
@@ -105,7 +122,9 @@ def test_runs_through_the_episode_engine() -> None:
     sim = GBMSimulator(s0=100.0, sigma=_SIGMA, maturity=_MATURITY, n_steps=10)
     state = sim.simulate(64, noise=NoiseSpec(seed=41))
     policy = NoTransactionBandPolicy(sigma=_SIGMA, maturity=_MATURITY)
-    pnl = hedge_pnl(state, policy, EuropeanCall(strike=100.0), ProportionalCost(rate=1e-3))
+    pnl = hedge_pnl(
+        state, policy, EuropeanCall(strike=100.0), ProportionalCost(rate=1e-3)
+    )
     assert pnl.shape == (64,)
     pnl.mean().backward()
     grads = [p.grad for p in policy.parameters() if p.grad is not None]

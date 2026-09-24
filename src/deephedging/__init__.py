@@ -100,7 +100,7 @@ from deephedging.risk import (
 )
 from deephedging.training import TrainConfig, hedge_pnl, pnl_from_positions, train
 
-__version__ = "0.1.0"
+from ._version import version as __version__
 
 __all__ = [
     "AsianCall",
@@ -165,6 +165,7 @@ __all__ = [
     "UpAndOutCall",
     "VarianceFeatures",
     "ZeroGenerator",
+    "__version__",
     "bootstrap_metric",
     "bs_call_delta",
     "bs_call_price",

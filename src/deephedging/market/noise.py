@@ -76,5 +76,7 @@ class NoiseSpec:
             A freshly seeded generator.
         """
         generator = torch.Generator(device=device)
-        generator.manual_seed(_splitmix64((self.seed ^ (self.stream * _GOLDEN)) & _MASK))
+        generator.manual_seed(
+            _splitmix64((self.seed ^ (self.stream * _GOLDEN)) & _MASK)
+        )
         return generator

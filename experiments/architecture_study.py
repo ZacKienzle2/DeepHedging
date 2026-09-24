@@ -68,9 +68,9 @@ def make_arm(name: str, device: str) -> HedgePolicy:
     if name == "recurrent":
         return RecurrentPolicy(n_features=3, hidden_size=36).to(device)
     if name == "band":
-        return NoTransactionBandPolicy(sigma=SIGMA, maturity=MATURITY, hidden_sizes=(64, 64)).to(
-            device
-        )
+        return NoTransactionBandPolicy(
+            sigma=SIGMA, maturity=MATURITY, hidden_sizes=(64, 64)
+        ).to(device)
     msg = f"unknown arm {name}"
     raise ValueError(msg)
 
@@ -100,7 +100,11 @@ def main() -> None:
 
     results_path, completed = open_store(RESULTS, arguments.smoke)
     simulator = GBMSimulator(
-        s0=100.0, sigma=SIGMA, maturity=MATURITY, n_steps=N_STEPS, device=arguments.device
+        s0=100.0,
+        sigma=SIGMA,
+        maturity=MATURITY,
+        n_steps=N_STEPS,
+        device=arguments.device,
     )
     payoff = EuropeanCall(strike=STRIKE)
     premium = float(bs_call_price(100.0, STRIKE, SIGMA, MATURITY))
@@ -117,7 +121,9 @@ def main() -> None:
                 policy = make_arm(arm, arguments.device)
                 parameters = sum(p.numel() for p in policy.parameters())
                 config = TrainConfig(
-                    n_iterations=(recurrent_iterations if arm == "recurrent" else base_iterations),
+                    n_iterations=(
+                        recurrent_iterations if arm == "recurrent" else base_iterations
+                    ),
                     batch_paths=batch_paths,
                     lr=1e-3,
                     seed=seed,
@@ -137,7 +143,11 @@ def main() -> None:
                 duration = time.perf_counter() - started
                 with torch.no_grad():
                     pnl = hedge_pnl(
-                        eval_state, policy, payoff, cost_model(cost_rate), premium=premium
+                        eval_state,
+                        policy,
+                        payoff,
+                        cost_model(cost_rate),
+                        premium=premium,
                     )
                 summary = pnl_summary(pnl)
                 append_record(

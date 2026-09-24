@@ -44,7 +44,9 @@ def test_reproducible_with_noise_spec() -> None:
 
 def test_zero_vol_of_vol_degenerates_to_gbm_marginals() -> None:
     v0 = 0.04
-    state = _simulator(v0=v0, theta=v0, xi=0.0, rho=0.0).simulate(200_000, noise=NoiseSpec(seed=19))
+    state = _simulator(v0=v0, theta=v0, xi=0.0, rho=0.0).simulate(
+        200_000, noise=NoiseSpec(seed=19)
+    )
     log_returns = torch.log(state.terminal / 100.0)
     expected_std = math.sqrt(v0 * 1.0)
     expected_mean = -0.5 * v0 * 1.0

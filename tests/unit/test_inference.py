@@ -3,7 +3,11 @@
 import pytest
 import torch
 
-from deephedging.evaluation import bootstrap_metric, expected_shortfall, paired_bootstrap
+from deephedging.evaluation import (
+    bootstrap_metric,
+    expected_shortfall,
+    paired_bootstrap,
+)
 
 
 def _sample(n: int = 20_000, seed: int = 3) -> torch.Tensor:
@@ -26,8 +30,12 @@ def test_bootstrap_interval_brackets_the_point_estimate() -> None:
 
 def test_bootstrap_is_reproducible_with_seed() -> None:
     pnl = _sample()
-    first = bootstrap_metric(pnl, lambda sample: expected_shortfall(sample, 0.95), seed=7)
-    second = bootstrap_metric(pnl, lambda sample: expected_shortfall(sample, 0.95), seed=7)
+    first = bootstrap_metric(
+        pnl, lambda sample: expected_shortfall(sample, 0.95), seed=7
+    )
+    second = bootstrap_metric(
+        pnl, lambda sample: expected_shortfall(sample, 0.95), seed=7
+    )
     assert (first.low, first.high) == (second.low, second.high)
 
 
@@ -48,7 +56,11 @@ def test_paired_bootstrap_detects_a_dominant_strategy() -> None:
     first = _sample()
     second = first - 0.5
     result = paired_bootstrap(
-        first, second, lambda sample: expected_shortfall(sample, 0.9), n_resamples=300, seed=4
+        first,
+        second,
+        lambda sample: expected_shortfall(sample, 0.9),
+        n_resamples=300,
+        seed=4,
     )
     assert result.difference < 0.0
     assert result.high < 0.0

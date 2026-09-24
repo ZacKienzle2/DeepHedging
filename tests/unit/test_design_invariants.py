@@ -48,7 +48,9 @@ def _antithetic_states(n_paths: int, seed: int) -> tuple[MarketState, MarketStat
     return build(z), build(-z)
 
 
-def _residual_correlation(policy: FeedForwardPolicy, premium: float) -> tuple[float, float]:
+def _residual_correlation(
+    policy: FeedForwardPolicy, premium: float
+) -> tuple[float, float]:
     plus, minus = _antithetic_states(50_000, seed=11)
     payoff = EuropeanCall(strike=_STRIKE)
     with torch.no_grad():
@@ -99,7 +101,9 @@ def test_additive_control_variate_leaves_gradients_untouched() -> None:
     policy = FeedForwardPolicy(hidden_sizes=(32, 32))
     plain_loss = (-hedge_pnl(state, policy, payoff, NoCost(), premium=premium)).mean()
     plain_grads = torch.autograd.grad(plain_loss, list(policy.parameters()))
-    cv_loss = (-(hedge_pnl(state, policy, payoff, NoCost(), premium=premium) - control)).mean()
+    cv_loss = (
+        -(hedge_pnl(state, policy, payoff, NoCost(), premium=premium) - control)
+    ).mean()
     cv_grads = torch.autograd.grad(cv_loss, list(policy.parameters()))
 
     for plain, controlled in zip(plain_grads, cv_grads, strict=True):

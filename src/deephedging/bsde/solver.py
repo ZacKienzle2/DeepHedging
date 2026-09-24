@@ -170,11 +170,15 @@ def train_bsde(
     )
     loss_history: list[torch.Tensor] = []
     for iteration in range(config.n_iterations):
-        y_terminal, target = solver(problem, config.batch_paths, noise=batch_noise(iteration + 1))
+        y_terminal, target = solver(
+            problem, config.batch_paths, noise=batch_noise(iteration + 1)
+        )
         loss = nn.functional.mse_loss(y_terminal, target)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
         loss_history.append(loss.detach())
     losses = torch.stack(loss_history).cpu().tolist()
-    return BSDEResult(y0=float(solver.y0.detach()), final_loss=losses[-1], losses=losses)
+    return BSDEResult(
+        y0=float(solver.y0.detach()), final_loss=losses[-1], losses=losses
+    )

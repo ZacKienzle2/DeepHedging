@@ -8,8 +8,12 @@ from deephedging.instruments import AsianCall, AsianPut
 def _paths(n_steps: int = 20, n_paths: int = 5000, seed: int = 1) -> torch.Tensor:
     generator = torch.Generator()
     generator.manual_seed(seed)
-    increments = 0.02 * torch.randn(n_steps, n_paths, generator=generator, dtype=torch.float64)
-    log_path = torch.cat([torch.zeros(1, n_paths, dtype=torch.float64), increments.cumsum(dim=0)])
+    increments = 0.02 * torch.randn(
+        n_steps, n_paths, generator=generator, dtype=torch.float64
+    )
+    log_path = torch.cat(
+        [torch.zeros(1, n_paths, dtype=torch.float64), increments.cumsum(dim=0)]
+    )
     return 100.0 * torch.exp(log_path)
 
 

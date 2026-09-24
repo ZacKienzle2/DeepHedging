@@ -85,12 +85,16 @@ def test_costs_strictly_reduce_pnl() -> None:
 
 
 def test_terminal_liquidation_charges_final_close() -> None:
-    sim = GBMSimulator(s0=100.0, sigma=0.2, maturity=1.0, n_steps=20, dtype=torch.float64)
+    sim = GBMSimulator(
+        s0=100.0, sigma=0.2, maturity=1.0, n_steps=20, dtype=torch.float64
+    )
     state = sim.simulate(512, noise=NoiseSpec(seed=5))
     payoff = EuropeanCall(strike=100.0)
     cost = ProportionalCost(rate=1e-3)
     held = hedge_pnl(state, ConstantPolicy(0.5), payoff, cost)
-    closed = hedge_pnl(state, ConstantPolicy(0.5), payoff, cost, liquidate_terminal=True)
+    closed = hedge_pnl(
+        state, ConstantPolicy(0.5), payoff, cost, liquidate_terminal=True
+    )
     expected_charge = cost(state.spot.new_full((state.n_paths,), 0.5), state.spot[-1])
     assert torch.allclose(held - closed, expected_charge, atol=1e-6)
 
@@ -119,9 +123,13 @@ def test_recurrent_policy_threads_state_and_matches_checkpointed_gradients() -> 
 
     def run(checkpoint_steps: bool) -> tuple[torch.Tensor, list[torch.Tensor]]:
         policy.zero_grad()
-        pnl = hedge_pnl(state, policy, payoff, NoCost(), checkpoint_steps=checkpoint_steps)
+        pnl = hedge_pnl(
+            state, policy, payoff, NoCost(), checkpoint_steps=checkpoint_steps
+        )
         pnl.mean().backward()
-        grads = [p.grad.detach().clone() for p in policy.parameters() if p.grad is not None]
+        grads = [
+            p.grad.detach().clone() for p in policy.parameters() if p.grad is not None
+        ]
         return pnl.detach(), grads
 
     pnl_plain, grads_plain = run(checkpoint_steps=False)
@@ -157,10 +165,14 @@ def test_checkpointed_episode_matches_plain_gradients() -> None:
 
     def run(checkpoint_steps: bool) -> tuple[torch.Tensor, list[torch.Tensor]]:
         policy.zero_grad()
-        pnl = hedge_pnl(state, policy, payoff, NoCost(), checkpoint_steps=checkpoint_steps)
+        pnl = hedge_pnl(
+            state, policy, payoff, NoCost(), checkpoint_steps=checkpoint_steps
+        )
         loss = pnl.mean()
         loss.backward()
-        grads = [p.grad.detach().clone() for p in policy.parameters() if p.grad is not None]
+        grads = [
+            p.grad.detach().clone() for p in policy.parameters() if p.grad is not None
+        ]
         return loss.detach(), grads
 
     loss_plain, grads_plain = run(checkpoint_steps=False)

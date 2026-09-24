@@ -163,7 +163,10 @@ def test_mean_variance_reduces_to_mean_on_constant_loss() -> None:
     loss = torch.full((100,), 3.0, dtype=torch.float64)
     with torch.no_grad():
         assert abs(float(MeanVariance(risk_aversion=5.0)(loss)) - 3.0) < 1e-9
-        assert abs(float(MeanVariance(risk_aversion=5.0, downside=True)(loss)) - 3.0) < 1e-9
+        assert (
+            abs(float(MeanVariance(risk_aversion=5.0, downside=True)(loss)) - 3.0)
+            < 1e-9
+        )
 
 
 def test_mean_variance_weighted_matches_unweighted_under_uniform_weights() -> None:

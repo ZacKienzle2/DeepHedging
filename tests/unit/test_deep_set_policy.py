@@ -88,7 +88,12 @@ def test_deep_set_policy_trains_a_multi_asset_hedge() -> None:
     eval_state = sim.simulate(50_000, noise=NoiseSpec(seed=73))
     with torch.no_grad():
         hedged = hedge_pnl(
-            eval_state, policy, payoff, NoCost(), premium=premium, feature_map=feature_map
+            eval_state,
+            policy,
+            payoff,
+            NoCost(),
+            premium=premium,
+            feature_map=feature_map,
         )
     unhedged = premium - payoff(eval_state.spot)
     assert float(expected_shortfall(hedged, alpha=0.9)) < 0.6 * float(

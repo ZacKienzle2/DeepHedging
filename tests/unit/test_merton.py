@@ -118,5 +118,7 @@ def test_invalid_parameters_raise() -> None:
 
 
 def test_many_jumps_per_step_keep_the_poisson_mean() -> None:
-    state = _simulator(jump_intensity=200.0, n_steps=10).simulate(4096, noise=NoiseSpec(seed=3))
+    state = _simulator(jump_intensity=200.0, n_steps=10).simulate(
+        4096, noise=NoiseSpec(seed=3)
+    )
     assert abs(float(state.aux["jumps"][-1].mean()) - 200.0) < 2.0

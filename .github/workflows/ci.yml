@@ -1,113 +1,88 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
-    branches: [main]
-  workflow_dispatch: {}
+  push:
+    branches:
+      - main
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Many color libraries just need this variable to be set to any value.
+  # Set it to 3 to support 8-bit color graphics (256 colors per channel)
+  # for libraries that care about the value set.
+  FORCE_COLOR: 3
+
 jobs:
-  pre-commit:
-    name: Run pre-commit hooks
+  lint:
+    name: Format
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - name: Harden runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
-        with:
-          egress-policy: audit
-
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version-file: .python-version
-
-      # The official action installs pre-commit and caches the hook
-      # environments on the configuration's hash, which is the recipe the
-      # pre-commit documentation gives for continuous integration. Its default
-      # is --all-files, so a hook added to the configuration is applied to the
-      # whole tree by the change that adds it.
-      - name: Run pre-commit
-        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-        # pyright reads the project's synced environment, which the Python
-        # workflow builds, so the hook runs there and pre-commit's SKIP variable
-        # leaves it out of this job.
-        env:
-          SKIP: pyright
-
-  gitleaks:
-    name: Scan for leaked secrets
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Harden runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
-        with:
-          egress-policy: audit
-
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-          # The scan walks history, which needs all of it.
           fetch-depth: 0
 
-      # The pre-commit hook scans what is staged, which is the right scan
-      # while committing and finds nothing on a runner. This scans the
-      # repository's history. The official action needs a licence key for
-      # organisation accounts only.
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  link-check:
-    name: Check Markdown links
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Harden runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+      - uses: actions/setup-python@v7
         with:
-          egress-policy: audit
+          python-version: "3.x"
 
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: astral-sh/setup-uv@v10.1.0
+
+      - uses: j178/prek-action@v2
+
+  checks:
+    name: Check Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.runs-on }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+        runs-on: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
+
+    steps:
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0
 
-      - name: Link checker
-        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
+      - uses: actions/setup-python@v7
         with:
-          args: --no-progress --verbose --config lychee.toml './**/*.md'
-          fail: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
 
-  ci-summary:
-    name: CI summary gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    needs:
-      - pre-commit
-      - gitleaks
-      - link-check
+      - uses: astral-sh/setup-uv@v10.1.0
+
+      - name: Install package
+        run: uv sync
+
+      - name: Test package
+        run: >-
+          uv run pytest -ra --cov --cov-report=xml --cov-report=term
+          --durations=20
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  pass:
     if: always()
+    needs: [lint, checks]
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
     steps:
-      # re-actors/alls-green reads the needs context and fails on any failed
-      # or cancelled job, so branch protection requires this one name rather
-      # than every job above.
-      - name: Decide whether the needed jobs succeeded
-        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}

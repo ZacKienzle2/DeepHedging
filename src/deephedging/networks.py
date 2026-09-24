@@ -5,7 +5,9 @@ from itertools import pairwise
 from torch import nn
 
 
-def mlp(in_features: int, hidden_sizes: tuple[int, ...], out_features: int) -> nn.Sequential:
+def mlp(
+    in_features: int, hidden_sizes: tuple[int, ...], out_features: int
+) -> nn.Sequential:
     """Builds a multilayer perceptron with SiLU activations.
 
     Args:

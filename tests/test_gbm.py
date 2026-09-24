@@ -33,7 +33,9 @@ from deephedging import GBMSimulator, NoiseSpec
 def test_fuzz_gbm_simulator_simulate(
     self: GBMSimulator, n_paths: int, noise: deephedging.NoiseSpec | None
 ) -> None:
-    deephedging.market.gbm.GBMSimulator.simulate(self=self, n_paths=n_paths, noise=noise)
+    deephedging.market.gbm.GBMSimulator.simulate(
+        self=self, n_paths=n_paths, noise=noise
+    )
 
 
 @given(n_steps=st.integers(1, 128))

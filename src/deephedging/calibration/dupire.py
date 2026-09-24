@@ -50,7 +50,9 @@ class LocalVolSurface:
         Returns:
             Volatilities over the strike grid, shape ``(n_times, n_strikes)``.
         """
-        upper = torch.searchsorted(self.taus, times).clamp(min=1, max=self.taus.shape[0] - 1)
+        upper = torch.searchsorted(self.taus, times).clamp(
+            min=1, max=self.taus.shape[0] - 1
+        )
         lower = upper - 1
         span = self.taus[upper] - self.taus[lower]
         weight = ((times - self.taus[lower]) / span).clamp(min=0.0, max=1.0)
@@ -94,11 +96,15 @@ def dupire_surface(
     strike_step = float(spacing[0])
 
     tensors = params.as_tensors()
-    prices = torch.stack([price_surface(tensors, s0, strikes, float(tau)) for tau in taus])
+    prices = torch.stack(
+        [price_surface(tensors, s0, strikes, float(tau)) for tau in taus]
+    )
 
     (time_derivative,) = torch.gradient(prices, spacing=(taus,), dim=0)
     convexity = torch.clamp(torch.diff(prices, n=2, dim=1) / strike_step**2, min=1e-7)
     inner_strikes = strikes[1:-1]
     local_variance = 2.0 * time_derivative[:, 1:-1] / (inner_strikes**2 * convexity)
     local_variance = torch.clamp(local_variance, min=_MIN_VARIANCE, max=_MAX_VARIANCE)
-    return LocalVolSurface(taus=taus, strikes=inner_strikes, vols=torch.sqrt(local_variance))
+    return LocalVolSurface(
+        taus=taus, strikes=inner_strikes, vols=torch.sqrt(local_variance)
+    )

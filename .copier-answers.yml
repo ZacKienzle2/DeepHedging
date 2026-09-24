@@ -1,22 +1,15 @@
-# Written by copier. Do not edit by hand: `copier update` rewrites it, and a
-# hand-edited answer is the drift this template exists to remove.
-_commit: 0e313ae
-_src_path: https://github.com/ZacKienzle2/repo-template.git
-gitattributes_own: []
-github_repository: ZacKienzle2/DeepHedging
-gitignore_own: []
-has_adrs: false
-has_ast_grep: false
-has_chezmoi: false
-has_cog: false
-has_cpp: false
-has_generated_changelog: true
-has_import_linter: false
-has_latex: false
-has_node: false
-has_notebooks: true
-has_python: true
-has_snakemake: false
-mypy_overrides: {}
-precommit_exclude_own: []
-track_benchmarks: true
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 2026.08.14-8-g72fb90f
+_src_path: gh:scientific-python/cookie
+backend: hatch
+docs: sphinx
+email: zac.kienzle@gmail.com
+full_name: Zac Kienzle
+license: MIT
+org: ZacKienzle2
+project_name: deephedging
+project_short_description: Neural hedging policies (GRU, deep-set, no-trade-band)
+    minimising CVaR, entropic and spectral risk under transaction costs, on fused
+    CUDA kernels at billions of paths per second, with a deep BSDE pricer.
+url: https://github.com/ZacKienzle2/DeepHedging
+vcs: true

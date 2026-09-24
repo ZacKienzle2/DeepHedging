@@ -27,14 +27,16 @@ def test_equivalent_merton_call_price_per_term_merton_call_price(
     strike: float,
     tau: float,
 ) -> None:
-    result_merton_call_price_per_term = deephedging.baselines.merton_call_price_per_term(
-        spot=spot,
-        strike=strike,
-        sigma=sigma,
-        jump_intensity=jump_intensity,
-        jump_mean=jump_mean,
-        jump_vol=jump_vol,
-        tau=tau,
+    result_merton_call_price_per_term = (
+        deephedging.baselines.merton_call_price_per_term(
+            spot=spot,
+            strike=strike,
+            sigma=sigma,
+            jump_intensity=jump_intensity,
+            jump_mean=jump_mean,
+            jump_vol=jump_vol,
+            tau=tau,
+        )
     )
     result_merton_call_price = deephedging.merton_call_price(
         spot=spot,
@@ -45,4 +47,6 @@ def test_equivalent_merton_call_price_per_term_merton_call_price(
         jump_vol=jump_vol,
         tau=tau,
     )
-    torch.testing.assert_close(result_merton_call_price, result_merton_call_price_per_term)
+    torch.testing.assert_close(
+        result_merton_call_price, result_merton_call_price_per_term
+    )

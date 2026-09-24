@@ -34,12 +34,14 @@ def test_equivalent_bootstrap_metric_per_resample_bootstrap_metric(
     pnl: torch.Tensor,
     seed: int,
 ) -> None:
-    result_bootstrap_metric_per_resample = deephedging.baselines.bootstrap_metric_per_resample(
-        pnl=pnl,
-        metric=metric,
-        n_resamples=n_resamples,
-        confidence=confidence,
-        seed=seed,
+    result_bootstrap_metric_per_resample = (
+        deephedging.baselines.bootstrap_metric_per_resample(
+            pnl=pnl,
+            metric=metric,
+            n_resamples=n_resamples,
+            confidence=confidence,
+            seed=seed,
+        )
     )
     result_bootstrap_metric = deephedging.bootstrap_metric(
         pnl=pnl,

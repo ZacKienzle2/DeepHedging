@@ -43,7 +43,9 @@ class MarketState:
 
     spot: torch.Tensor
     aux: Mapping[str, torch.Tensor] = field(default_factory=dict)
-    _cache: dict[str, torch.Tensor] = field(default_factory=dict, repr=False, compare=False)
+    _cache: dict[str, torch.Tensor] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     @classmethod
     def from_spot(cls, spot: torch.Tensor) -> "MarketState":

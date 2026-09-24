@@ -55,6 +55,12 @@ def merton_call_price(
     weights = Poisson(expected_jumps).log_prob(counts).exp()
     mean_jump_size = math.exp(jump_mean + 0.5 * jump_vol**2) - 1.0
     sigma_n = torch.sqrt(sigma**2 + counts * jump_vol**2 / tau)
-    rate_n = -jump_intensity * mean_jump_size + counts * (jump_mean + 0.5 * jump_vol**2) / tau
-    prices = bs_call_price(spot, strike, sigma_n, tau, rate=rate_n) * torch.exp(rate_n * tau)
-    return (weights * prices).sum()
+    rate_n = (
+        -jump_intensity * mean_jump_size
+        + counts * (jump_mean + 0.5 * jump_vol**2) / tau
+    )
+    prices = bs_call_price(spot, strike, sigma_n, tau, rate=rate_n) * torch.exp(
+        rate_n * tau
+    )
+    price: torch.Tensor = (weights * prices).sum()
+    return price

@@ -21,7 +21,9 @@ from deephedging.market.state import MarketState
 def _level_column(
     codes: tuple[float, ...], n_paths: int, dtype: torch.dtype, device: torch.device
 ) -> torch.Tensor:
-    column = torch.tensor(codes, dtype=dtype, device=device).repeat(n_paths // len(codes))
+    column = torch.tensor(codes, dtype=dtype, device=device).repeat(
+        n_paths // len(codes)
+    )
     return column.unsqueeze(-1)
 
 
@@ -252,5 +254,7 @@ class LevelFeatures:
             Features of shape ``(n_paths, base.n_features + 1)``.
         """
         features = self.base(state, t, tau, position)
-        column = _level_column(self.codes, features.shape[0], features.dtype, features.device)
+        column = _level_column(
+            self.codes, features.shape[0], features.dtype, features.device
+        )
         return torch.cat((features, column), dim=-1)
