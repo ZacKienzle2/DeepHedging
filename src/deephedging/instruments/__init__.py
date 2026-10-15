@@ -1,7 +1,13 @@
 """Derivative payoffs."""
 
 from deephedging.instruments.asian import AsianCall, AsianPut
-from deephedging.instruments.barrier import UpAndOutCall
+from deephedging.instruments.barrier import (
+    DoubleKnockOutCall,
+    DownAndInCall,
+    DownAndOutCall,
+    UpAndInCall,
+    UpAndOutCall,
+)
 from deephedging.instruments.base import Payoff
 from deephedging.instruments.basket import BasketCall, GeometricBasketCall
 from deephedging.instruments.lookback import LookbackCall, LookbackPut
@@ -12,6 +18,9 @@ __all__ = [
     "AsianCall",
     "AsianPut",
     "BasketCall",
+    "DoubleKnockOutCall",
+    "DownAndInCall",
+    "DownAndOutCall",
     "EuropeanCall",
     "EuropeanPut",
     "GeometricBasketCall",
@@ -19,5 +28,6 @@ __all__ = [
     "LookbackPut",
     "Payoff",
     "SingleAssetPayoff",
+    "UpAndInCall",
     "UpAndOutCall",
 ]
